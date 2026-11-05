@@ -189,7 +189,7 @@ textarea{width:100%;border:1px solid #cfdad5;border-radius:10px;padding:12px;res
 .mbox h2{margin:0 0 6px;font-size:24px;padding-right:30px}.mintro{color:var(--graph);margin:0 0 14px;max-width:75ch}.mbody{margin-top:6px}
 .mclose{position:absolute;top:14px;right:14px;width:34px;height:34px;border:0;border-radius:50%;background:none;display:grid;place-items:center;color:var(--graph)}.mclose:hover{background:#eff4f1}
 .merr{color:var(--bad);font-weight:600;min-height:20px;margin-top:10px}.mactions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:6px}
-#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,30px);opacity:0;z-index:300;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;font-size:13.5px;max-width:min(560px,90vw);transition:.2s;pointer-events:none}#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,30px);opacity:0;z-index:2147483001;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;font-size:13.5px;max-width:min(560px,90vw);transition:.2s;pointer-events:none}#toast.show{opacity:1;transform:translate(-50%,0)}
 #gate{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;background-color:var(--ink);
   background-image:radial-gradient(circle at 15% 10%,#14634f 0,#0b4d3e 55%,#083a2f 100%)}
 .gcard{position:relative;width:100%;max-width:540px;background:#fff;border-radius:16px;padding:36px 38px 30px;box-shadow:0 30px 90px #0007;display:flex;flex-direction:column;gap:12px}
@@ -1433,8 +1433,23 @@ function startDemo() {
 async function openMyData() {
   if (hasFolderAPI()) {
     let dir; try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { return; }
-    const files = await readFolderEnvelopes(dir);
-    if (!files.length) return toast('Não encontrei dados da PAUTA nessa pasta (ficheiro «PAUTA_dados.pauta»).', 5000);
+    let files = await readFolderEnvelopes(dir);
+    if (!files.length) {   // procura também dentro das pastas (ex.: escolheu a pen inteira e os dados estão na pasta PAUTA)
+      const subs = []; try { for await (const [, h] of dir.entries()) if (h.kind === 'directory') subs.push(h); } catch (e) { }
+      for (const sd of subs.slice(0, 40)) { const f = await readFolderEnvelopes(sd); if (f.length) { dir = sd; files = f; break; } }
+    }
+    if (!files.length) {
+      const wasOpen = !!APP.state && !APP.demo;
+      gate(`<h1>Não encontrei os seus dados em «${esc(dir.name || 'pen')}».</h1>
+        <p>Os dados da PAUTA estão num ficheiro chamado <b>PAUTA_dados.pauta</b>. Esse ficheiro só existe na pen se, na PAUTA antiga, tiver usado «Os meus dados → Guardar também numa pen».</p>
+        <p><b>Se nunca o fez</b>, os seus dados estão guardados dentro da PAUTA antiga, neste computador:</p>
+        <ol style="text-align:left;line-height:1.6"><li>Abra a PAUTA antiga (o ficheiro PAUTA.html da pen ou o ícone antigo) e entre com a palavra-passe.</li>
+        <li>Carregue em «Os meus dados → Guardar também numa pen» e escolha a pasta da pen.</li>
+        <li>Volte aqui, carregue em «Abrir os meus dados» e escolha essa mesma pasta.</li></ol>
+        <button class="btn primary lg" id="gTry">Escolher outra pasta</button><button class="link" id="gBack">Voltar</button>`);
+      $('#gTry').onclick = openMyData; $('#gBack').onclick = () => wasOpen ? closeGate() : boot();
+      return;
+    }
     if (!APP.license) await licenseFromFolder(dir);
     if (!APP.license) return licenseScreen(() => askPasswordFor(files[0].env, `Encontrei «${files[0].name}» em «${dir.name}».`, { dir, name: files[0].name.startsWith('PAUTA_dados') ? files[0].name : 'PAUTA_dados.pauta' }));
     return askPasswordFor(files[0].env, `Encontrei «${files[0].name}» em «${dir.name}» (guardado a ${new Date(files[0].time).toLocaleString('pt-PT', { dateStyle: 'medium', timeStyle: 'short' })}).`, { dir, name: files[0].name.startsWith('PAUTA_dados') ? files[0].name : 'PAUTA_dados.pauta' });
@@ -1606,7 +1621,7 @@ if (/^https?:$/.test(location.protocol)) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '2.2';
+const PAUTA_VERSAO = '2.3';
 if (/^https?:$/.test(location.protocol)) {
   try { const antes = localStorage.getItem('pautaVersao'); if (antes && antes !== PAUTA_VERSAO) setTimeout(() => toast(`A PAUTA foi atualizada para a versão ${PAUTA_VERSAO}.`, 5000), 1500); localStorage.setItem('pautaVersao', PAUTA_VERSAO); } catch (e) { }
   const verNova = async () => {
