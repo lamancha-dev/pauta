@@ -1621,7 +1621,8 @@ if (/^https?:$/.test(location.protocol)) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '2.3';
+const PAUTA_VERSAO = '2.4';
+const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 if (/^https?:$/.test(location.protocol)) {
   try { const antes = localStorage.getItem('pautaVersao'); if (antes && antes !== PAUTA_VERSAO) setTimeout(() => toast(`A PAUTA foi atualizada para a versão ${PAUTA_VERSAO}.`, 5000), 1500); localStorage.setItem('pautaVersao', PAUTA_VERSAO); } catch (e) { }
   const verNova = async () => {
@@ -1635,6 +1636,40 @@ if (/^https?:$/.test(location.protocol)) {
     $('#nvGo').onclick = async () => { $('#nvGo').disabled = true; $('#nvGo').textContent = 'A atualizar…'; clearTimeout(saveTimer); try { await persist(); } catch (e) { } location.reload(); };
   };
   setTimeout(verNova, 5000); setInterval(verNova, 20 * 60 * 1000); window.addEventListener('focus', verNova);
+}
+// ---------------------------------------------------------------- PAUTA da pen: atualiza-se sozinha a partir da Internet
+if (location.protocol === 'file:') {
+  const avisoPen = async () => {
+    if ($('#novaVersao') || !navigator.onLine) return;
+    let v = null; try { v = (await (await fetch(PAUTA_ONLINE + 'version.json?t=' + Date.now(), { cache: 'no-store' })).json()).versao; } catch (e) { return; }
+    if (!v || v === PAUTA_VERSAO) return;
+    const d = document.createElement('div'); d.id = 'novaVersao';
+    d.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:14px;padding:12px 14px 12px 18px;border-radius:12px;background:#0b4d3e;color:#fff;box-shadow:0 10px 30px #0b2a2266;max-width:calc(100vw - 32px)';
+    d.innerHTML = `<span><b>Há uma versão nova da PAUTA (${esc(v)}).</b> Os seus dados não mudam.</span><button class="btn sm" id="nvGo" style="background:#ff6a1a;border-color:#ff6a1a;color:#fff">Atualizar a PAUTA da pen</button>`;
+    document.body.appendChild(d);
+    $('#nvGo').onclick = atualizarPen;
+  };
+  async function atualizarPen() {
+    const b = $('#nvGo'); b.disabled = true; b.textContent = 'A descarregar…';
+    try {
+      const html = await (await fetch(PAUTA_ONLINE + 'index.html?t=' + Date.now(), { cache: 'no-store' })).text();
+      if (html.length < 500000 || !html.includes('PAUTA_VERSAO')) throw new Error('download');
+      // A pasta da PAUTA na pen: a mesma onde estão os dados, se lá estiver o PAUTA.html; senão, pergunta.
+      let dir = null;
+      if (APP.folder) { try { await APP.folder.dir.getFileHandle('PAUTA.html'); dir = APP.folder.dir; } catch (e) { } }
+      if (!dir) {
+        toast('Escolha a pasta da PAUTA na pen (a que tem o ficheiro PAUTA.html).', 6000);
+        try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { b.disabled = false; b.textContent = 'Atualizar a PAUTA da pen'; return; }
+        try { await dir.getFileHandle('PAUTA.html'); } catch (e) { b.disabled = false; b.textContent = 'Atualizar a PAUTA da pen'; return toast('Essa pasta não tem o ficheiro PAUTA.html. Escolha a pasta da PAUTA na pen.', 6000); }
+      }
+      b.textContent = 'A atualizar…';
+      clearTimeout(saveTimer); try { await persist(); } catch (e) { }
+      await writeFolderFileText(dir, 'PAUTA.html', html);
+      location.reload();
+    } catch (e) { b.disabled = false; b.textContent = 'Atualizar a PAUTA da pen'; toast('Não foi possível atualizar agora (sem Internet?). Tente mais tarde.', 5000); }
+  }
+  setTimeout(avisoPen, 4000); setInterval(avisoPen, 30 * 60 * 1000); window.addEventListener('online', avisoPen);
+  try { const antes = localStorage.getItem('pautaVersaoPen'); if (antes && antes !== PAUTA_VERSAO) setTimeout(() => toast(`A PAUTA da pen foi atualizada para a versão ${PAUTA_VERSAO}.`, 5000), 1500); localStorage.setItem('pautaVersaoPen', PAUTA_VERSAO); } catch (e) { }
 }
 setInterval(() => { if (APP.key && !APP.demo && !document.hidden && (APP.folder || (APP.remembered && APP.penIssue !== 'locked'))) syncPen(); }, 4000);
 window.addEventListener('focus', () => { if (APP.key && !APP.demo && (APP.folder || APP.remembered)) syncPen(); });
