@@ -1373,7 +1373,15 @@ async function boot() {
 
 // ---------------------------------------------------------------- ecrãs de entrada
 function welcome() {
-  const g = gate(`<h1>Boas-vindas à PAUTA.</h1><p>Corrija testes, lance notas e imprima pautas — sem Internet, sem instalar nada.</p>
+  const daPen = location.protocol === 'file:';
+  const semPen = daPen && !hasFolderAPI();
+  const g = gate(daPen ? `<h1>Boas-vindas à PAUTA.</h1>
+    ${semPen ? `<p class="gwarn">${ic('help')}Este navegador não consegue usar a pen. Feche esta janela e abra o ficheiro PAUTA com o <b>Google Chrome</b> ou o <b>Microsoft Edge</b>.</p>` : `<p>Primeira vez neste computador? Carregue em «Abrir a minha PAUTA», escolha a pasta da PAUTA na pen e carregue em <b>«Selecionar pasta»</b>. Se o navegador perguntar, escolha <b>«Editar ficheiros»</b> / <b>«Permitir»</b>.</p>`}
+    <div class="gchoices">
+      <button class="gc primary" data-g="open">${ic('usb')}<b>Abrir a minha PAUTA</b><small>As minhas turmas que estão nesta pen</small></button>
+      <button class="gc" data-g="new">${ic('plus')}<b>Começar do zero</b><small>Ainda não tenho turmas na PAUTA</small></button>
+      <button class="gc" data-g="demo">${ic('spark')}<b>Experimentar</b><small>Uma turma fictícia para explorar. Nada é guardado.</small></button>
+    </div>` : `<h1>Boas-vindas à PAUTA.</h1><p>Corrija testes, lance notas e imprima pautas — sem Internet, sem instalar nada.</p>
     <div class="gchoices">
       <button class="gc primary" data-g="new">${ic('plus')}<b>Começar</b><small>Criar a minha palavra-passe e a primeira turma</small></button>
       <button class="gc" data-g="open">${ic('usb')}<b>Abrir os meus dados</b><small>Já uso a PAUTA noutro computador ou tenho uma cópia</small></button>
@@ -1432,7 +1440,7 @@ function startDemo() {
 // ---------------------------------------------------------------- pen / pasta e ficheiros
 async function openMyData() {
   if (hasFolderAPI()) {
-    let dir; try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { return; }
+    let dir; try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { if (e && e.name !== 'AbortError') pastaBloqueada(); return; }
     let files = await readFolderEnvelopes(dir);
     if (!files.length) {   // procura também dentro das pastas (ex.: escolheu a pen inteira e os dados estão na pasta PAUTA)
       const subs = []; try { for await (const [, h] of dir.entries()) if (h.kind === 'directory') subs.push(h); } catch (e) { }
@@ -1457,6 +1465,20 @@ async function openMyData() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pauta,.json';
   inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const env = JSON.parse(await f.text()); if (!isEnvelope(env)) throw 0; needLicense(() => askPasswordFor(env, `Ficheiro «${f.name}».`, null)); } catch (e) { toast('Este ficheiro não é uma cópia da PAUTA.'); } };
   inp.click();
+}
+/** O computador (ex.: da escola) não deixa o navegador usar pastas: abre o ficheiro de dados diretamente. */
+function pastaBloqueada() {
+  const wasOpen = !!APP.state && !APP.demo;
+  gate(`<h1>Este computador não deixa a PAUTA usar a pen.</h1>
+    <p>Acontece em alguns computadores de escolas, por segurança. Pode trabalhar na mesma: escolha o ficheiro <b>PAUTA_dados.pauta</b> que está na pasta da PAUTA na pen.</p>
+    <p class="gwarn">${ic('help')}Neste computador, as alterações ficam guardadas só aqui. No fim, use «Os meus dados → Guardar cópia de segurança» e copie esse ficheiro para a pen.</p>
+    <button class="btn primary lg" id="gFile">Escolher o ficheiro PAUTA_dados.pauta</button><button class="link" id="gBack">Voltar</button>`);
+  $('#gBack').onclick = () => wasOpen ? closeGate() : boot();
+  $('#gFile').onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pauta,.json';
+    inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const env = JSON.parse(await f.text()); if (!isEnvelope(env)) throw 0; needLicense(() => askPasswordFor(env, `Ficheiro «${f.name}».`, null)); } catch (e) { toast('Este ficheiro não é uma cópia da PAUTA.'); } };
+    inp.click();
+  };
 }
 function askPasswordFor(env, label, folder) {
   const wasOpen = !!APP.state && !APP.demo;
@@ -1486,7 +1508,7 @@ async function adoptFolder(dir, name, skipWrite = false) {
 }
 async function choosePen() {
   if (APP.demo) return toast('No modo de experiência nada é guardado.');
-  let dir; try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { return; }
+  let dir; try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { if (e && e.name !== 'AbortError') toast('Este computador não deixa a PAUTA usar a pen. Use «Guardar cópia de segurança» e copie o ficheiro para a pen.', 7000); return; }
   const files = await readFolderEnvelopes(dir); const main = files.find(f => f.name === 'PAUTA_dados.pauta');
   if (main) {
     let same = false; try { const { data } = await decryptEnvelope(main.env, APP.key); same = JSON.stringify(data) === JSON.stringify(APP.state); } catch (e) { }
@@ -1621,14 +1643,15 @@ if (/^https?:$/.test(location.protocol)) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '2.4';
+const PAUTA_VERSAO = '2.5';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
+const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol)) {
   try { const antes = localStorage.getItem('pautaVersao'); if (antes && antes !== PAUTA_VERSAO) setTimeout(() => toast(`A PAUTA foi atualizada para a versão ${PAUTA_VERSAO}.`, 5000), 1500); localStorage.setItem('pautaVersao', PAUTA_VERSAO); } catch (e) { }
   const verNova = async () => {
     if ($('#novaVersao')) return;
     let v = null; try { v = (await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json()).versao; } catch (e) { return; }
-    if (!v || v === PAUTA_VERSAO) return;
+    if (!v || !maisNova(v, PAUTA_VERSAO)) return;
     const d = document.createElement('div'); d.id = 'novaVersao';
     d.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:14px;padding:12px 14px 12px 18px;border-radius:12px;background:#0b4d3e;color:#fff;box-shadow:0 10px 30px #0b2a2266;max-width:calc(100vw - 32px)';
     d.innerHTML = `<span><b>Há uma versão nova da PAUTA.</b> Os seus dados não mudam.</span><button class="btn sm" id="nvGo" style="background:#ff6a1a;border-color:#ff6a1a;color:#fff">Atualizar agora</button>`;
@@ -1642,7 +1665,7 @@ if (location.protocol === 'file:') {
   const avisoPen = async () => {
     if ($('#novaVersao') || !navigator.onLine) return;
     let v = null; try { v = (await (await fetch(PAUTA_ONLINE + 'version.json?t=' + Date.now(), { cache: 'no-store' })).json()).versao; } catch (e) { return; }
-    if (!v || v === PAUTA_VERSAO) return;
+    if (!v || !maisNova(v, PAUTA_VERSAO)) return;
     const d = document.createElement('div'); d.id = 'novaVersao';
     d.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:14px;padding:12px 14px 12px 18px;border-radius:12px;background:#0b4d3e;color:#fff;box-shadow:0 10px 30px #0b2a2266;max-width:calc(100vw - 32px)';
     d.innerHTML = `<span><b>Há uma versão nova da PAUTA (${esc(v)}).</b> Os seus dados não mudam.</span><button class="btn sm" id="nvGo" style="background:#ff6a1a;border-color:#ff6a1a;color:#fff">Atualizar a PAUTA da pen</button>`;
