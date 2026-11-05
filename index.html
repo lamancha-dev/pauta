@@ -524,7 +524,7 @@ async function persist() {
   try {
     const env = await encryptState(APP.state, APP.key, APP.salt);
     const prev = await idbGet('vault'); if (prev) await idbPut('vault_anterior', prev);
-    await idbPut('vault', env); APP.savedVersion = v; APP.error = '';
+    await idbPut('vault', env); APP.savedVersion = v; APP.error = ''; copiaDiaria(env);
     if (APP.folder) {
       try { await writePen(env); APP.folderVersion = v; }
       catch (e) { penOff(APP.folder, 'absent'); setTimeout(() => syncPen(), 50); }   // pen retirada ou alterada noutro computador: volta a sincronizar sozinha
@@ -1090,7 +1090,7 @@ function pautaScreenHTML(c) {
   }).join('');
   const missing = new Map(); students.forEach(s => (finalGrade(c, s, t)?.missing || c.domains.filter(d => Number(d.weight) > 0).map(d => d.name)).forEach(x => missing.set(x, (missing.get(x) || 0) + 1)));
   return `<div class="phead"><div><h2>Pauta do ${esc(T)}</h2><p>Por domínio: a nota de cada momento (0–20), a média e o valor ponderado pelo peso. A PAUTA calcula a proposta; à direita regista a autoavaliação, a classificação final que decide e observações.${c.cumulative && t > 0 ? ' Inclui os momentos dos períodos anteriores (avaliação contínua).' : ''}</p></div>
-    <div class="btnrow"><button class="btn primary" data-print-pauta>${ic('print')}Imprimir pauta (A4, 30 alunos)</button><button class="btn" data-excel-pauta>${ic('excel')}Excel</button></div></div>
+    <div class="btnrow"><button class="btn primary" data-print-pauta>${ic('print')}Imprimir pauta (A4, 30 alunos)</button><button class="btn" data-excel-pauta>${ic('excel')}Excel</button><button class="btn" data-inovar>${ic('check')}Passar para o Inovar</button></div></div>
     ${missing.size ? `<div class="alert soft">${ic('help')}<span>Notas em falta: ${[...missing].map(([d, n]) => `<b>${esc(d)}</b> (${n === students.length ? 'todos os alunos' : n + ' aluno' + (n === 1 ? '' : 's')})`).join(', ')}. Nesses casos a classificação (assinalada com *) é calculada com os restantes domínios, redistribuindo os pesos.</span></div>` : ''}
     ${students.length ? `<div class="tablewrap"><table class="grade pauta"><thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty sm"><p>Adicione alunos para ver a pauta.</p></div>'}
     ${moms.length ? `<p class="legend">${moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${m.term !== t ? ` (${esc(terms(c)[m.term])})` : ''}${Number(m.weight) === 2 ? ' — conta a dobrar' : ''}`).join(' · ')}</p>` : ''}`;
@@ -1165,8 +1165,8 @@ function settingsHTML() {
       <div class="logo-row"><span class="lt">Logótipo do professor <small>(opcional)</small></span>${t.teacherLogo ? `<img src="${t.teacherLogo}" alt="Logótipo do professor">` : '<span class="nologo">Sem logótipo</span>'}<label class="btn sm">${ic('upload')}${t.teacherLogo ? 'Mudar' : 'Carregar'}<input type="file" id="teacherLogoFile" accept="image/png,image/jpeg,image/webp" hidden></label>${t.teacherLogo ? '<button class="btn sm" data-del-tlogo>Retirar</button>' : ''}</div>
     </div><p class="hint">Aparecem no cabeçalho de todas as impressões (pauta, grelha em branco), junto com o logótipo da PAUTA. Todas as impressões são em A4.</p></section>
   <section><h2>Licença</h2>${APP.license ? `<p>Licenciado a <b>${esc(APP.license.name)}</b>${APP.license.school ? ' · ' + esc(APP.license.school) : ''}. Este nome aparece em todas as impressões.</p>` : '<p class="hint">Sem licença (modo de experiência).</p>'}<button class="btn sm" data-change-license>${ic('lock')}${APP.license ? 'Mudar a chave de licença' : 'Ativar licença'}</button></section>
-  <section><h2>Os meus dados</h2><p class="hint">Os dados ficam cifrados com a sua palavra-passe, neste computador e, se escolher, numa pen. Nada é enviado para a Internet.</p>
-    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
+  <section><h2>Os meus dados</h2><p class="hint">Os dados ficam cifrados com a sua palavra-passe, neste computador e, se escolher, numa pen. Nada é enviado para a Internet.${LOCAL ? ' Todos os dias é feita uma cópia de segurança automática em Documentos › PAUTA - cópias de segurança (guarda as do último mês).' : ''} A chave de recuperação abre os dados se se esquecer da palavra-passe.</p>
+    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-rec>${ic('lock')}Criar chave de recuperação</button><button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
 }
 function helpHTML() {
   return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página.</p></div></section>
@@ -1437,7 +1437,8 @@ function createPassword() {
     APP.salt = crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(a, APP.salt);
     APP.demo = false; APP.state = emptyState(); APP.folder = null; APP.remembered = null;
     await persist(); if (LOCAL) { try { await adoptFolder(localDir(), 'PAUTA_dados.pauta'); } catch (e) { } }
-    closeGate(); go('home'); if (!APP.state.classes.length) setTimeout(newClassDialog, 200);
+    try { localStorage.setItem('pautaNovidades', PAUTA_VERSAO); } catch (e) { }
+    closeGate(); go('home'); setTimeout(() => criarChave(a, () => { if (!APP.state.classes.length) newClassDialog(); else ofertaInstalar(); }), 300);
   };
   $('#pgo').onclick = submit; $('#p2').onkeydown = e => { if (e.key === 'Enter') submit(); };
   $('#pback').onclick = () => APP.demo ? closeGate() : welcome();
@@ -1453,7 +1454,7 @@ function lockScreen(msg = '') {
       const env = await idbGet('vault'); const { data, key } = await decryptEnvelope(env, pw);
       if (!validState(data)) throw new Error('dados');
       APP.state = data; APP.key = key; APP.salt = unb64(env.salt); APP.demo = false; APP.version = APP.savedVersion = 0;
-      closeGate(); go('home'); restorePen(pw); setTimeout(ofertaInstalar, 2500);
+      closeGate(); go('home'); restorePen(pw); setTimeout(() => mostrarNovidades(ofertaInstalar), 2000);
     } catch (e) { $('#gerr').textContent = 'Palavra-passe errada. Tente de novo.'; $('#pgo').disabled = false; $('#pw').select(); }
   };
   $('#pgo').onclick = submit; $('#pw').onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -1462,6 +1463,7 @@ function lockScreen(msg = '') {
     const g2 = gate(`<h1>Sem a palavra-passe não é possível abrir os dados.</h1><p>Estão cifrados e ninguém os consegue ler — nem a PAUTA. Pode abrir uma cópia que tenha guardado com outra palavra-passe, ou apagar tudo neste computador e começar de novo.</p>
       <label class="f">Para apagar tudo, escreva APAGAR<input id="del"></label><div class="gerr" id="gerr"></div>
       <button class="btn danger lg" id="gdel">Apagar os dados deste computador</button><button class="link" id="gb">Voltar</button>`);
+    g2.querySelector('h1').insertAdjacentHTML('afterend', '<button class="btn primary lg" id="gRec" style="margin:4px 0 14px">Tenho a chave de recuperação</button>'); $('#gRec').onclick = recuperar;
     $('#gb').onclick = () => lockScreen(); $('#gdel').onclick = async () => { if ($('#del').value.trim().toUpperCase() !== 'APAGAR') return $('#gerr').textContent = 'Escreva APAGAR para confirmar.'; await idbDel('vault'); await idbDel('vault_anterior'); await idbDel('folder'); welcome(); };
   };
 }
@@ -1474,7 +1476,7 @@ function startDemo() {
 
 // ---------------------------------------------------------------- pen / pasta e ficheiros
 async function openMyData() {
-  if (hasFolderAPI()) {
+  if (hasFolderAPI() && !(LOCAL && APP.state && !APP.demo)) {
     let dir; if (LOCAL) dir = localDir(); else { try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { if (e && e.name !== 'AbortError') pastaBloqueada(); return; } }
     if (LOCAL && !(await dirReachable(dir))) return semPen();
     let files = []; try { files = await readFolderEnvelopes(dir); } catch (e) { if (LOCAL) return semPen(); }
@@ -1546,7 +1548,7 @@ function askPasswordFor(env, label, folder) {
     APP.state = data; APP.demo = false; APP.salt = folder ? unb64(env.salt) : crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(pw, APP.salt);
     APP.folder = null; APP.remembered = null; APP.penIssue = '';
     if (folder) { try { await adoptFolder(folder.dir, folder.name, true); } catch (e) { } }
-    APP.version++; await persist(); closeGate(); go('home'); setTimeout(ofertaInstalar, 2500);
+    APP.version++; await persist(); closeGate(); go('home'); setTimeout(() => mostrarNovidades(ofertaInstalar), 2000);
     toast(`Dados abertos: ${n} turma(s).${data.__legacy ? '' : ''}${folder ? ' As alterações continuam a ser guardadas na pen.' : ''}`, 4500);
   };
   $('#pgo').onclick = submit; $('#pw').onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -1695,7 +1697,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '2.8';
+const PAUTA_VERSAO = '2.9';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -1716,7 +1718,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
 if (location.protocol === 'file:' || LOCAL) {
   // Pens antigas: instala o ícone da PAUTA (PAUTA.exe) uma vez, para abrir sem pedir pastas.
   const iconePen = async () => {
-    if (LOCAL || !APP.folder || !navigator.onLine || iconePen.feito) return;
+    if (LOCAL || !APP.folder || !navigator.onLine || iconePen.feito || /Mac/i.test(navigator.platform)) return;
     const root = APP.folder.dir;
     try { await root.getFileHandle('PAUTA.exe'); iconePen.feito = true; return; } catch (e) { }
     try {
@@ -1773,12 +1775,136 @@ async function backupCopy() {
   if (APP.folder) { try { await writeFolderFile(APP.folder.dir, name, env); return toast(`Cópia guardada na pen: ${name}`, 4500); } catch (e) { } }
   download(blob, name); toast(`Cópia guardada nas Transferências: ${name}. Abre-se com a mesma palavra-passe.`, 5000);
 }
+// ---------------------------------------------------------------- chave de recuperação da palavra-passe
+// Guarda a palavra-passe cifrada com a chave de recuperação (e a chave cifrada com a palavra-passe, para a atualizar).
+const REC_FILE = 'PAUTA_recuperacao.pauta';
+const REC_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function novaChaveRec() { const r = crypto.getRandomValues(new Uint8Array(20)); let c = ''; for (let i = 0; i < 20; i++) { c += REC_ABC[r[i] % 32]; if (i % 5 === 4 && i < 19) c += '-'; } return c; }
+const normRec = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+async function encTxt(txt, key) { const iv = crypto.getRandomValues(new Uint8Array(12)); return { iv: b64(iv), d: b64(new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(txt)))) }; }
+async function decTxt(o, key) { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, key, unb64(o.d))); }
+async function recSelar(pw, code) {
+  const s1 = crypto.getRandomValues(new Uint8Array(16)), s2 = crypto.getRandomValues(new Uint8Array(16));
+  return { format: 'PAUTA_RECUPERACAO', v: 1, s1: b64(s1), s2: b64(s2), pw: await encTxt(pw, await deriveKey(normRec(code), s1)), code: await encTxt(code, await deriveKey(pw, s2)), updatedAt: new Date().toISOString() };
+}
+async function recPasta() {
+  if (LOCAL) return localDir();
+  if (APP.folder?.dir) return APP.folder.dir;
+  return null;
+}
+async function recGuardar(rec) {
+  try { await idbPut('recuperacao', rec); } catch (e) { }
+  const dir = await recPasta(); if (dir) { try { await writeFolderFileText(dir, REC_FILE, JSON.stringify(rec)); } catch (e) { } }
+}
+async function recLer() {
+  let rec = null; try { rec = await idbGet('recuperacao'); } catch (e) { }
+  if (rec) return rec;
+  let dir = LOCAL ? localDir() : null;
+  if (!dir) { try { const cfg = await idbGet('folder'); if (cfg?.dir && await cfg.dir.queryPermission({ mode: 'read' }) === 'granted') dir = cfg.dir; } catch (e) { } }
+  if (dir) { try { const t = await (await (await dir.getFileHandle(REC_FILE)).getFile()).text(); const r = JSON.parse(t); if (r.format === 'PAUTA_RECUPERACAO') return r; } catch (e) { } }
+  return null;
+}
+async function recAtualizarPw(oldPw, newPw) {
+  const rec = await recLer(); if (!rec) return;
+  try { const code = await decTxt(rec.code, await deriveKey(oldPw, unb64(rec.s2))); await recGuardar(await recSelar(newPw, code)); } catch (e) { }
+}
+function mostrarChave(code, then) {
+  modal({ title: 'A sua chave de recuperação', closable: false,
+    intro: 'Se se esquecer da palavra-passe, esta chave abre os seus dados. Escreva-a num papel e guarde-o num sítio seguro, longe da pen.',
+    body: `<div style="font:700 1.45rem/1.3 ui-monospace,Consolas,monospace;letter-spacing:.06em;text-align:center;padding:16px;border:2px dashed #0b4d3e;border-radius:10px;margin:6px 0 12px;user-select:all">${esc(code)}</div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="recOk"> Já escrevi a chave num papel</label>`,
+    actions: [{ label: 'Copiar a chave', keepOpen: true, run: async () => { try { await navigator.clipboard.writeText(code); toast('Chave copiada.'); } catch (e) { toast('Selecione a chave e copie com Ctrl + C.'); } return false; } },
+      { label: 'Continuar', kind: 'primary', run: () => { if (!$('#recOk').checked) return mErr('Confirme que escreveu a chave num papel.'); setTimeout(() => then?.(), 50); } }] });
+}
+async function criarChave(pw, then) {
+  if (APP.demo) return toast('No modo de experiência nada é guardado.');
+  const fazer = async p => { const code = novaChaveRec(); await recGuardar(await recSelar(p, code)); mostrarChave(code, then); };
+  if (pw) return fazer(pw);
+  modal({ title: 'Criar chave de recuperação', intro: 'Escreva a sua palavra-passe. A seguir mostro-lhe a chave para guardar em papel.', body: '<label class="f">Palavra-passe<input type="password" id="recPw"></label>',
+    actions: [{ label: 'Cancelar' }, { label: 'Criar a chave', kind: 'primary', keepOpen: true, run: async () => {
+      const p = $('#recPw').value; try { await decryptEnvelope(await idbGet('vault'), p); } catch (e) { return mErr('A palavra-passe não está certa.'); }
+      await fazer(p); return false; } }] });
+}
+function recuperar() {
+  const g = gate(`<h1>Recuperar a palavra-passe</h1><p>Escreva a chave de recuperação que guardou em papel (por exemplo, ABCDE-FGH23-…).</p>
+    <label class="f">Chave de recuperação<input id="recCode" autocomplete="off" spellcheck="false" style="text-transform:uppercase"></label>
+    <div class="gerr" id="gerr"></div><button class="btn primary lg" id="rgo">Recuperar</button><button class="link" id="rback">Voltar</button>`);
+  $('#rback').onclick = () => lockScreen();
+  $('#rgo').onclick = async () => {
+    $('#gerr').textContent = 'A procurar…';
+    const rec = await recLer();
+    if (!rec) return $('#gerr').textContent = 'Não encontrei a chave de recuperação neste computador nem na pen. Ligue a pen da PAUTA e tente de novo.';
+    let pw = null; try { pw = await decTxt(rec.pw, await deriveKey(normRec($('#recCode').value), unb64(rec.s1))); } catch (e) { }
+    if (!pw) return $('#gerr').textContent = 'Esta chave não está certa. Confirme as letras e os números.';
+    gate(`<h1>Encontrei a sua palavra-passe.</h1><p>A sua palavra-passe é:</p><div style="font:700 1.3rem ui-monospace,Consolas,monospace;padding:12px;border:2px dashed #0b4d3e;border-radius:10px;text-align:center;user-select:all">${esc(pw)}</div>
+      <p class="hint">Escreva-a num local seguro. Depois de entrar, pode mudá-la em «Os meus dados → Mudar a palavra-passe».</p><button class="btn primary lg" id="rOpen">Entrar na PAUTA</button>`);
+    $('#rOpen').onclick = () => { lockScreen(); $('#pw').value = pw; $('#pgo').click(); };
+  };
+}
+
+// ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
+const NOVIDADES = [
+  'Abre com um clique no ícone PAUTA da pen: só pede a palavra-passe.',
+  'Pode ter a PAUTA também no computador: ícone no Ambiente de Trabalho, com ou sem a pen.',
+  'Chave de recuperação: se se esquecer da palavra-passe, recupera-a com esta chave.',
+  'Cópias de segurança automáticas, todos os dias, na pasta Documentos do computador.',
+  'Versão para Mac.',
+  'Na pauta do período: «Passar para o Inovar», com as notas pela ordem dos números, prontas a lançar.',
+];
+async function mostrarNovidades(then) {
+  let visto = null; try { visto = localStorage.getItem('pautaNovidades'); localStorage.setItem('pautaNovidades', PAUTA_VERSAO); } catch (e) { }
+  const temChave = !!(await recLer());
+  if (visto === PAUTA_VERSAO || APP.demo) { if (!temChave && !APP.demo) return lembrarChave(then); return then?.(); }
+  modal({ title: `Novidades da PAUTA ${PAUTA_VERSAO}`, body: `<ul style="margin:0;padding-left:1.2em;line-height:1.6">${NOVIDADES.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`,
+    actions: temChave ? [{ label: 'Fechar', kind: 'primary', run: () => { setTimeout(() => then?.(), 50); } }]
+      : [{ label: 'Mais tarde', run: () => { setTimeout(() => then?.(), 50); } }, { label: 'Criar a minha chave de recuperação', kind: 'primary', run: () => { setTimeout(() => criarChave(null, then), 50); } }] });
+}
+function lembrarChave(then) {
+  let ult = 0; try { ult = Number(localStorage.getItem('pautaLembrarChave')) || 0; } catch (e) { }
+  if (Date.now() - ult < 7 * 864e5) return then?.();
+  try { localStorage.setItem('pautaLembrarChave', String(Date.now())); } catch (e) { }
+  modal({ title: 'Ainda não tem chave de recuperação', intro: 'Sem ela, se se esquecer da palavra-passe, perde os dados. Demora um minuto.',
+    actions: [{ label: 'Mais tarde', run: () => { setTimeout(() => then?.(), 50); } }, { label: 'Criar agora', kind: 'primary', run: () => { setTimeout(() => criarChave(null, then), 50); } }] });
+}
+
+// ---------------------------------------------------------------- cópia de segurança automática (uma por dia, em Documentos)
+async function copiaDiaria(env) {
+  if (!LOCAL) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  try { if (localStorage.getItem('pautaCopia') === hoje) return; } catch (e) { }
+  try { const r = await localApi('/api/copia', { method: 'POST', body: JSON.stringify(env) }); if (r.ok) { try { localStorage.setItem('pautaCopia', hoje); } catch (e) { } } } catch (e) { }
+}
+// ---------------------------------------------------------------- passar as notas para o Inovar (ou outro programa da escola)
+/** A nota a lançar: a classificação final que o professor decidiu; se não decidiu, a proposta arredondada. */
+function notaALancar(c, s, t) {
+  const fin = c.termNotes?.[t]?.[s.id]?.final;
+  if (isNum(fin) && String(fin) !== '') return { v: String(fin), decidida: true };
+  const fg = finalGrade(c, s, t); if (!fg) return { v: '', decidida: false };
+  return { v: String(c.level === 'basico' ? basicLevel(c, fg.pct) : Math.round(fg.v20)), decidida: false };
+}
+function passarInovar() {
+  const c = cur(); if (!c) return; const t = view.term;
+  const st = activeStudents(c).slice().sort((x, y) => (Number(x.n) || 999) - (Number(y.n) || 999));
+  const linhas = st.map(s => ({ s, ...notaALancar(c, s, t) }));
+  const porDecidir = linhas.filter(l => l.v && !l.decidida).length;
+  modal({ wide: true, title: `Passar para o Inovar — ${esc(c.name)}, ${esc(terms(c)[t])}`,
+    intro: 'O Inovar não deixa importar ficheiros: as notas escrevem-se à mão. Escreva-as pela ordem desta lista (por número de aluno, como no Inovar) e vá marcando as que já passou.' + (porDecidir ? ` <b>${porDecidir} nota(s) ainda são só a proposta</b> (a cinzento): confirme-as na pauta antes de lançar.` : ''),
+    body: `<div style="max-height:56vh;overflow:auto;border:1px solid #d9e4e0;border-radius:10px">
+      <table style="width:100%;border-collapse:collapse;font-size:1.05rem">
+      <thead><tr style="position:sticky;top:0;background:#0b4d3e;color:#fff"><th style="padding:8px 10px;text-align:left">N.º</th><th style="padding:8px 10px;text-align:left">Aluno</th><th style="padding:8px 10px">${c.level === 'basico' ? 'Nível' : 'Classificação'}</th><th style="padding:8px 10px">Já passei</th></tr></thead>
+      <tbody>${linhas.map((l, i) => `<tr style="border-top:1px solid #e3ebe8" data-inv-row="${i}"><td style="padding:7px 10px;font-variant-numeric:tabular-nums">${esc(l.s.n || '')}</td><td style="padding:7px 10px">${esc(l.s.name)}</td>
+        <td style="padding:7px 10px;text-align:center;font:700 1.35rem/1 ui-monospace,Consolas,monospace;color:${l.decidida ? '#0b4d3e' : '#8a9a95'}">${esc(l.v || '—')}</td>
+        <td style="padding:7px 10px;text-align:center"><input type="checkbox" aria-label="Já passei a nota de ${esc(l.s.name)}" onchange="this.closest('tr').style.opacity=this.checked?'.35':'1'"></td></tr>`).join('')}</tbody></table></div>`,
+    actions: [{ label: 'Copiar as notas (uma por linha)', keepOpen: true, run: async () => { const txt = linhas.map(l => l.v).join('\n'); try { await navigator.clipboard.writeText(txt); toast('Notas copiadas, pela ordem dos números.'); } catch (e) { toast('Não foi possível copiar neste computador.'); } return false; } },
+      { label: 'Fechar', kind: 'primary' }] });
+}
 function changePassword() {
   modal({ title: 'Mudar a palavra-passe', body: `<label class="f">Palavra-passe atual<input type="password" id="op"></label><label class="f">Nova palavra-passe (mín. 8)<input type="password" id="np1"></label><label class="f">Repetir a nova<input type="password" id="np2"></label>`,
     actions: [{ label: 'Cancelar' }, { label: 'Mudar', kind: 'primary', run: async () => {
       const env = await idbGet('vault'); try { await decryptEnvelope(env, $('#op').value); } catch (e) { return mErr('A palavra-passe atual não está certa.'); }
       const a = $('#np1').value; if (a.length < 8) return mErr('Mínimo 8 caracteres.'); if (a !== $('#np2').value) return mErr('As palavras-passe não coincidem.');
-      APP.salt = crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(a, APP.salt); APP.version++; await persist(); toast('Palavra-passe mudada. Cópias antigas continuam a abrir com a palavra-passe antiga.', 5000);
+      const antiga = $('#op').value;
+      APP.salt = crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(a, APP.salt); APP.version++; await persist(); recAtualizarPw(antiga, a); toast('Palavra-passe mudada. Cópias antigas continuam a abrir com a palavra-passe antiga.', 5000);
     } }] });
 }
 
@@ -1863,6 +1989,8 @@ document.addEventListener('click', async e => {
   if (a('[data-del-tlogo]')) { APP.state.teacher.teacherLogo = ''; changed(); return render(); }
   if (a('[data-start-real]')) return needLicense(createPassword, () => closeGate());
   if (a('[data-close-app]')) return closeApp();
+  if (a('[data-rec]')) return criarChave();
+  if (a('[data-inovar]')) return passarInovar();
   if (a('[data-instalar]')) { try { localStorage.removeItem('pautaNaoInstalar'); } catch (e) { } return localApi('/api/instalar', { method: 'POST' }).then(r => toast(r.ok ? 'Pronto: tem o ícone PAUTA no Ambiente de Trabalho.' : 'Só é possível com a PAUTA aberta pelo ícone da pen.', 6000)).catch(() => toast('Não foi possível pôr o ícone. Tente de novo.')); }
   if (t.closest('#btnSync')) return atualizar();
   if (a('[data-change-license]')) return licenseScreen(() => { closeGate(); render(); }, () => closeGate());
