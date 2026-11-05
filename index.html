@@ -1605,6 +1605,22 @@ if (/^https?:$/.test(location.protocol)) {
   for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png'], ['icon', 'icon-192.png']]) { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
+// ---------------------------------------------------------------- aviso de versão nova (só na versão online)
+const PAUTA_VERSAO = '2.2';
+if (/^https?:$/.test(location.protocol)) {
+  try { const antes = localStorage.getItem('pautaVersao'); if (antes && antes !== PAUTA_VERSAO) setTimeout(() => toast(`A PAUTA foi atualizada para a versão ${PAUTA_VERSAO}.`, 5000), 1500); localStorage.setItem('pautaVersao', PAUTA_VERSAO); } catch (e) { }
+  const verNova = async () => {
+    if ($('#novaVersao')) return;
+    let v = null; try { v = (await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json()).versao; } catch (e) { return; }
+    if (!v || v === PAUTA_VERSAO) return;
+    const d = document.createElement('div'); d.id = 'novaVersao';
+    d.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:14px;padding:12px 14px 12px 18px;border-radius:12px;background:#0b4d3e;color:#fff;box-shadow:0 10px 30px #0b2a2266;max-width:calc(100vw - 32px)';
+    d.innerHTML = `<span><b>Há uma versão nova da PAUTA.</b> Os seus dados não mudam.</span><button class="btn sm" id="nvGo" style="background:#ff6a1a;border-color:#ff6a1a;color:#fff">Atualizar agora</button>`;
+    document.body.appendChild(d);
+    $('#nvGo').onclick = async () => { $('#nvGo').disabled = true; $('#nvGo').textContent = 'A atualizar…'; clearTimeout(saveTimer); try { await persist(); } catch (e) { } location.reload(); };
+  };
+  setTimeout(verNova, 5000); setInterval(verNova, 20 * 60 * 1000); window.addEventListener('focus', verNova);
+}
 setInterval(() => { if (APP.key && !APP.demo && !document.hidden && (APP.folder || (APP.remembered && APP.penIssue !== 'locked'))) syncPen(); }, 4000);
 window.addEventListener('focus', () => { if (APP.key && !APP.demo && (APP.folder || APP.remembered)) syncPen(); });
 async function backupCopy() {
