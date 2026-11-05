@@ -565,6 +565,16 @@ function localDir() {
   return _localDir;
 }
 if (LOCAL) setInterval(() => localApi('/api/ping').catch(() => { }), 30000);
+/** Aberta pela pen: oferece pôr o ícone da PAUTA no Ambiente de Trabalho deste computador (uma vez). */
+async function ofertaInstalar() {
+  if (!LOCAL || APP.demo) return;
+  try { if (localStorage.getItem('pautaNaoInstalar') === '1') return; } catch (e) { }
+  let info = null; try { info = await (await localApi('/api/info')).json(); } catch (e) { return; }
+  if (!info || !info.pen || info.instalado) return;
+  modal({ title: 'Ter a PAUTA também neste computador?', intro: 'Ponho o ícone da PAUTA no Ambiente de Trabalho. Com a pen ligada, abre as turmas da pen. Sem a pen, abre com o que ficou guardado neste computador e, quando voltar a ligar a pen, junta tudo sozinha.',
+    actions: [{ label: 'Agora não', run: () => { try { localStorage.setItem('pautaNaoInstalar', '1'); } catch (e) { } toast('Pode pôr o ícone mais tarde em «Definições».', 4500); } },
+      { label: 'Pôr o ícone no Ambiente de Trabalho', kind: 'primary', run: async () => { const r = await localApi('/api/instalar', { method: 'POST' }); if (!r.ok) throw new Error('Não foi possível pôr o ícone. Tente de novo.'); toast('Pronto: tem o ícone PAUTA no Ambiente de Trabalho.', 6000); } }] });
+}
 const hasFolderAPI = () => LOCAL || typeof window.showDirectoryPicker === 'function';
 
 // ---------------------------------------------------------------- dados da PAUTA anterior
@@ -1156,7 +1166,7 @@ function settingsHTML() {
     </div><p class="hint">Aparecem no cabeçalho de todas as impressões (pauta, grelha em branco), junto com o logótipo da PAUTA. Todas as impressões são em A4.</p></section>
   <section><h2>Licença</h2>${APP.license ? `<p>Licenciado a <b>${esc(APP.license.name)}</b>${APP.license.school ? ' · ' + esc(APP.license.school) : ''}. Este nome aparece em todas as impressões.</p>` : '<p class="hint">Sem licença (modo de experiência).</p>'}<button class="btn sm" data-change-license>${ic('lock')}${APP.license ? 'Mudar a chave de licença' : 'Ativar licença'}</button></section>
   <section><h2>Os meus dados</h2><p class="hint">Os dados ficam cifrados com a sua palavra-passe, neste computador e, se escolher, numa pen. Nada é enviado para a Internet.</p>
-    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}<button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
+    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
 }
 function helpHTML() {
   return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página.</p></div></section>
@@ -1443,7 +1453,7 @@ function lockScreen(msg = '') {
       const env = await idbGet('vault'); const { data, key } = await decryptEnvelope(env, pw);
       if (!validState(data)) throw new Error('dados');
       APP.state = data; APP.key = key; APP.salt = unb64(env.salt); APP.demo = false; APP.version = APP.savedVersion = 0;
-      closeGate(); go('home'); restorePen(pw);
+      closeGate(); go('home'); restorePen(pw); setTimeout(ofertaInstalar, 2500);
     } catch (e) { $('#gerr').textContent = 'Palavra-passe errada. Tente de novo.'; $('#pgo').disabled = false; $('#pw').select(); }
   };
   $('#pgo').onclick = submit; $('#pw').onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -1466,7 +1476,8 @@ function startDemo() {
 async function openMyData() {
   if (hasFolderAPI()) {
     let dir; if (LOCAL) dir = localDir(); else { try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { if (e && e.name !== 'AbortError') pastaBloqueada(); return; } }
-    let files = await readFolderEnvelopes(dir);
+    if (LOCAL && !(await dirReachable(dir))) return semPen();
+    let files = []; try { files = await readFolderEnvelopes(dir); } catch (e) { if (LOCAL) return semPen(); }
     if (LOCAL && !files.length) return welcome();
     if (/^recursos$/i.test(dir.name || '') && !files.some(f => f.name === 'PAUTA_dados.pauta')) {
       const wasOpen = !!APP.state && !APP.demo;
@@ -1500,6 +1511,13 @@ async function openMyData() {
   inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const env = JSON.parse(await f.text()); if (!isEnvelope(env)) throw 0; needLicense(() => askPasswordFor(env, `Ficheiro «${f.name}».`, null)); } catch (e) { toast('Este ficheiro não é uma cópia da PAUTA.'); } };
   inp.click();
 }
+/** PAUTA instalada no computador e a pen não está ligada (e ainda não há dados neste computador). */
+function semPen() {
+  gate(`<h1>Ligue a pen da PAUTA.</h1><p>Os seus dados estão na pen. Ligue-a a este computador: a PAUTA abre sozinha.</p>
+    <button class="btn primary lg" id="gTry">Já liguei a pen</button>`);
+  $('#gTry').onclick = openMyData;
+  clearInterval(semPen.t); semPen.t = setInterval(async () => { if ($('#gTry') && await dirReachable(localDir())) { clearInterval(semPen.t); openMyData(); } else if (!$('#gTry')) clearInterval(semPen.t); }, 3000);
+}
 /** O computador (ex.: da escola) não deixa o navegador usar pastas: abre o ficheiro de dados diretamente. */
 function pastaBloqueada() {
   const wasOpen = !!APP.state && !APP.demo;
@@ -1528,7 +1546,7 @@ function askPasswordFor(env, label, folder) {
     APP.state = data; APP.demo = false; APP.salt = folder ? unb64(env.salt) : crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(pw, APP.salt);
     APP.folder = null; APP.remembered = null; APP.penIssue = '';
     if (folder) { try { await adoptFolder(folder.dir, folder.name, true); } catch (e) { } }
-    APP.version++; await persist(); closeGate(); go('home');
+    APP.version++; await persist(); closeGate(); go('home'); setTimeout(ofertaInstalar, 2500);
     toast(`Dados abertos: ${n} turma(s).${data.__legacy ? '' : ''}${folder ? ' As alterações continuam a ser guardadas na pen.' : ''}`, 4500);
   };
   $('#pgo').onclick = submit; $('#pw').onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -1677,7 +1695,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '2.7';
+const PAUTA_VERSAO = '2.8';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -1845,6 +1863,7 @@ document.addEventListener('click', async e => {
   if (a('[data-del-tlogo]')) { APP.state.teacher.teacherLogo = ''; changed(); return render(); }
   if (a('[data-start-real]')) return needLicense(createPassword, () => closeGate());
   if (a('[data-close-app]')) return closeApp();
+  if (a('[data-instalar]')) { try { localStorage.removeItem('pautaNaoInstalar'); } catch (e) { } return localApi('/api/instalar', { method: 'POST' }).then(r => toast(r.ok ? 'Pronto: tem o ícone PAUTA no Ambiente de Trabalho.' : 'Só é possível com a PAUTA aberta pelo ícone da pen.', 6000)).catch(() => toast('Não foi possível pôr o ícone. Tente de novo.')); }
   if (t.closest('#btnSync')) return atualizar();
   if (a('[data-change-license]')) return licenseScreen(() => { closeGate(); render(); }, () => closeGate());
   if ((el = a('[data-data]'))) {
