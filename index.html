@@ -184,7 +184,7 @@ textarea{width:100%;border:1px solid #cfdad5;border-radius:10px;padding:12px;res
 .rtotal>b{font:700 24px var(--sans);color:var(--pen2);padding:4px 14px;border-radius:8px;background:var(--pen3)}.rtotal small{width:100%;color:var(--graph)}
 
 /* janela modal, aviso, entrada */
-#modal{position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;background:#0b2a228c;overflow:auto}#modal.open{display:flex}
+#modal{position:fixed;inset:0;z-index:450;display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;background:#0b2a228c;overflow:auto}#modal.open{display:flex}
 .mbox{position:relative;width:100%;max-width:560px;background:#fff;border-radius:14px;padding:24px 26px 20px;box-shadow:0 30px 80px #0b2a224d}.mbox.wide{max-width:900px}
 .mbox h2{margin:0 0 6px;font-size:24px;padding-right:30px}.mintro{color:var(--graph);margin:0 0 14px;max-width:75ch}.mbody{margin-top:6px}
 .mclose{position:absolute;top:14px;right:14px;width:34px;height:34px;border:0;border-radius:50%;background:none;display:grid;place-items:center;color:var(--graph)}.mclose:hover{background:#eff4f1}
@@ -1684,7 +1684,7 @@ function askPasswordFor(env, label, folder) {
     const pw = $('#pw').value; if (!pw) return; $('#pgo').disabled = true; $('#gerr').textContent = 'A abrir…';
     let data; try { data = await openAnyEnvelope(env, pw); } catch (e) { $('#gerr').textContent = e.message === 'Formato de dados desconhecido.' ? e.message : 'Palavra-passe errada.'; $('#pgo').disabled = false; return; }
     const n = data.classes.length, ns = sum(data.classes.map(c => c.students.length));
-    if (wasOpen && !(await confirmBox('Substituir os dados deste computador?', `Os dados abertos têm ${n} turma(s) e ${ns} aluno(s). Os dados atuais deste computador são substituídos (a versão anterior fica guardada como recurso).`, 'Substituir'))) { $('#pgo').disabled = false; $('#gerr').textContent = ''; return; }
+    if (wasOpen && APP.state?.classes?.length && !(await confirmBox('Substituir os dados deste computador?', `Os dados abertos têm ${n} turma(s) e ${ns} aluno(s). Os dados atuais deste computador são substituídos (a versão anterior fica guardada como recurso).`, 'Substituir'))) { $('#pgo').disabled = false; $('#gerr').textContent = ''; return; }
     APP.state = data; APP.demo = false; APP.salt = folder ? unb64(env.salt) : crypto.getRandomValues(new Uint8Array(16)); APP.key = await deriveKey(pw, APP.salt);
     APP.folder = null; APP.remembered = null; APP.penIssue = '';
     if (folder) { try { await adoptFolder(folder.dir, folder.name, true); } catch (e) { } }
@@ -1837,7 +1837,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.0.2';
+const PAUTA_VERSAO = '3.0.3';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
