@@ -829,7 +829,7 @@ function homeHTML() {
   const cls = APP.state.classes;
   const name = APP.state.teacher.name ? ', ' + esc(APP.state.teacher.name.split(' ')[0]) : '';
   if (!cls.length) return `<section class="hero"><div><h1>Olá${name}.</h1><p>Comece por criar uma turma. Demora menos de um minuto.</p></div></section>
-    <div class="empty">${ic('users', 'big')}<h2>Ainda não tem turmas</h2><p>Crie a turma, cole a lista de alunos e está pronta para lançar a primeira avaliação.</p><button class="btn primary lg" data-new-class>${ic('plus')}Criar a primeira turma</button></div>`;
+    <div class="empty">${ic('users', 'big')}<h2>Ainda não tem turmas</h2><p>Crie a turma, cole a lista de alunos e está pronta para lançar a primeira avaliação.</p><button class="btn primary lg" data-new-class>${ic('plus')}Criar a primeira turma</button>${hasFolderAPI() && !LOCAL ? `<p class="hint" style="margin-top:18px">Já tem turmas numa pen ou noutro computador?</p><button class="btn" data-data="open">${ic('usb')}Abrir as minhas turmas da pen</button>` : ''}</div>`;
   return `<section class="hero"><div><h1>Olá${name}.</h1><p>Escolha uma turma para corrigir testes, lançar notas ou imprimir a pauta.</p></div><button class="btn primary lg" data-new-class>${ic('plus')}Nova turma</button></section>
   <div class="cards">${cls.map(c => {
     const n = activeStudents(c).length; const moms = c.moments.length;
@@ -1542,10 +1542,10 @@ function welcome() {
       <button class="gc primary" data-g="open">${ic('usb')}<b>Abrir a minha PAUTA</b><small>As minhas turmas que estão nesta pen</small></button>
       <button class="gc" data-g="new">${ic('plus')}<b>Começar do zero</b><small>Ainda não tenho turmas na PAUTA</small></button>
       <button class="gc" data-g="demo">${ic('spark')}<b>Experimentar</b><small>Uma turma fictícia para explorar. Nada é guardado.</small></button>
-    </div>` : `<h1>Boas-vindas à PAUTA.</h1><p>Corrija testes, lance notas e imprima pautas — sem Internet, sem instalar nada.</p>
+    </div>` : `<h1>Boas-vindas à PAUTA.</h1><p>Já usa a PAUTA numa pen ou noutro computador? Ligue a pen e carregue em «Já tenho turmas na PAUTA». As suas turmas aparecem aqui.</p>
     <div class="gchoices">
-      <button class="gc primary" data-g="new">${ic('plus')}<b>Começar</b><small>Criar a minha palavra-passe e a primeira turma</small></button>
-      <button class="gc" data-g="open">${ic('usb')}<b>Abrir os meus dados</b><small>Já uso a PAUTA noutro computador ou tenho uma cópia</small></button>
+      <button class="gc primary" data-g="open">${ic('usb')}<b>Já tenho turmas na PAUTA</b><small>Abrir as minhas turmas da pen ou de uma cópia</small></button>
+      <button class="gc" data-g="new">${ic('plus')}<b>Começar do zero</b><small>É a primeira vez que uso a PAUTA</small></button>
       <button class="gc" data-g="demo">${ic('spark')}<b>Experimentar</b><small>Uma turma fictícia para explorar. Nada é guardado.</small></button>
     </div>`);
   g.onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ({ new: () => needLicense(createPassword, welcome), open: openMyData, demo: startDemo })[b.dataset.g](); };
@@ -1824,7 +1824,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.0';
+const PAUTA_VERSAO = '3.0.1';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
