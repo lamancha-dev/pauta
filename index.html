@@ -1603,10 +1603,13 @@ function startDemo() {
 
 // ---------------------------------------------------------------- pen / pasta e ficheiros
 async function openMyData() {
+  try { return await openMyData0(); } catch (e) { console.error(e); if (!LOCAL) return abrirFicheiroDados(); }
+}
+async function openMyData0() {
   if (hasFolderAPI() && !(LOCAL && APP.state && !APP.demo)) {
     let dir; if (LOCAL) dir = localDir(); else { try { dir = await showDirectoryPicker({ id: 'pauta-dados', mode: 'readwrite' }); } catch (e) { if (e && e.name !== 'AbortError') pastaBloqueada(); return; } }
     if (LOCAL && !(await dirReachable(dir))) return semPen();
-    let files = []; try { files = await readFolderEnvelopes(dir); } catch (e) { if (LOCAL) return semPen(); }
+    let files = []; try { files = await readFolderEnvelopes(dir); } catch (e) { if (LOCAL) return semPen(); return abrirFicheiroDados(); }
     if (LOCAL && !files.length) return welcome();
     if (/^recursos$/i.test(dir.name || '') && !files.some(f => f.name === 'PAUTA_dados.pauta')) {
       const wasOpen = !!APP.state && !APP.demo;
@@ -1627,8 +1630,8 @@ async function openMyData() {
         <ol style="text-align:left;line-height:1.6"><li>Abra a PAUTA antiga (o ficheiro PAUTA.html da pen ou o ícone antigo) e entre com a palavra-passe.</li>
         <li>Carregue em «Os meus dados → Guardar também numa pen» e escolha a pasta da pen.</li>
         <li>Volte aqui, carregue em «Abrir os meus dados» e escolha essa mesma pasta.</li></ol>
-        <button class="btn primary lg" id="gTry">Escolher outra pasta</button><button class="link" id="gBack">Voltar</button>`);
-      $('#gTry').onclick = openMyData; $('#gBack').onclick = () => wasOpen ? closeGate() : boot();
+        <button class="btn primary lg" id="gTry">Escolher outra pasta</button><button class="btn lg" id="gFile" style="margin-top:8px">Escolher o ficheiro PAUTA_dados</button><button class="link" id="gBack">Voltar</button>`);
+      $('#gTry').onclick = openMyData; $('#gFile').onclick = escolherFicheiroDados; $('#gBack').onclick = () => wasOpen ? closeGate() : boot();
       return;
     }
     if (!APP.license) await licenseFromFolder(dir);
@@ -1636,6 +1639,16 @@ async function openMyData() {
     if (LOCAL) return askPasswordFor(files[0].env, `As suas turmas estão na pen.`, { dir, name: files[0].name.startsWith('PAUTA_dados') ? files[0].name : 'PAUTA_dados.pauta' });
     return askPasswordFor(files[0].env, `Encontrei «${files[0].name}» em «${dir.name}» (guardado a ${new Date(files[0].time).toLocaleString('pt-PT', { dateStyle: 'medium', timeStyle: 'short' })}).`, { dir, name: files[0].name.startsWith('PAUTA_dados') ? files[0].name : 'PAUTA_dados.pauta' });
   }
+  escolherFicheiroDados();
+}
+/** Se o computador não deixar abrir a pasta: escolhe-se diretamente o ficheiro PAUTA_dados.pauta. */
+function abrirFicheiroDados() {
+  const wasOpen = !!APP.state && !APP.demo;
+  gate(`<h1>Escolha o ficheiro dos seus dados</h1><p>Este computador não deixou abrir a pasta. Não faz mal: carregue no botão, entre na pasta da PAUTA na pen e escolha o ficheiro <b>PAUTA_dados</b>.</p>
+    <button class="btn primary lg" id="gFile">Escolher o ficheiro PAUTA_dados</button><button class="link" id="gBack">Voltar</button>`);
+  $('#gFile').onclick = escolherFicheiroDados; $('#gBack').onclick = () => wasOpen ? closeGate() : boot();
+}
+function escolherFicheiroDados() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pauta,.json';
   inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const env = JSON.parse(await f.text()); if (!isEnvelope(env)) throw 0; needLicense(() => askPasswordFor(env, `Ficheiro «${f.name}».`, null)); } catch (e) { toast('Este ficheiro não é uma cópia da PAUTA.'); } };
   inp.click();
@@ -1824,7 +1837,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.0.1';
+const PAUTA_VERSAO = '3.0.2';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
