@@ -423,6 +423,9 @@ function domainGrade(m, sid, did) { const r = domainPoints(m, sid, did); return 
 function momentPercent(c, m, sid) {
   const ids = momentDomainIds(c, m).filter(id => !domainNA(m, sid, id)); if (!ids.length || isAbsent(m, sid)) return null;
   const g = ids.map(id => domainGrade(m, sid, id)); if (g.some(x => x === null)) return null;
+  // Média ponderada pelos pesos dos domínios (os mesmos da pauta do período). Sem pesos definidos: média simples.
+  const w = ids.map(id => Number(c.domains.find(d => d.id === id)?.weight) || 0); const W = sum(w);
+  if (W > 0) return sum(g.map((x, i) => x * w[i])) / W * 5;
   return sum(g) / g.length * 5;
 }
 function momentProgress(c, m) {
@@ -1911,7 +1914,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.1.0';
+const PAUTA_VERSAO = '3.1.1';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
