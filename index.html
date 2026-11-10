@@ -284,6 +284,40 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .srow.med .medchk{color:#2d4fa8;font-weight:600}
 .srow input.mednota{flex:1;min-width:160px;font-size:13px;color:var(--graph)}
 .grade input[data-s].na{color:#2d4fa8;background:#eef2fd;border-bottom-color:#a9bbe8}
+/* PAUTA 3.1 — escalas por nível, ensino profissional e grelhas finais */
+.qtot.over{color:var(--bad);font-weight:700}
+.seg.modseg{flex-wrap:wrap;max-width:100%}
+.seg.modseg button{white-space:nowrap}
+.stb{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.stb.ok{background:var(--mark);color:var(--ok);border-color:#bfdccd}
+.stb.nok{background:#fde2e1;color:var(--bad);border-color:#f3c0bc}
+.stb.eval{background:#fff6d9;color:var(--warn);border-color:#f1dea0}
+.stb.adj{background:var(--pen3);color:var(--pen2);border-color:#f7cfae}
+.grade td.stc{text-align:left;white-space:nowrap}
+.grade td.stc .btn{margin-left:4px}
+.grade th.evo,.grade td.evo{min-width:34px}
+.grade td.evo.cur,.grade th.evo.cur{background:var(--mark2)}
+.grade td.evo i{font-style:normal;font-size:10px;margin-left:2px}
+.grade td.evo i.up{color:var(--ok)}.grade td.evo i.dn{color:var(--bad)}
+.grade td.gcell.ok{background:var(--mark);color:var(--ok)}
+.grade td.gcell.nok{background:#fde2e1;color:var(--bad)}
+.grade td.gcell.eval{background:#fffaf0}
+.grade td.nm .link{padding:0;font-weight:inherit;text-align:left}
+.gsum{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:4px 0 12px;font-size:13.5px}
+.gsum b{font-size:16px;color:var(--ink)}
+.gbar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;margin:6px 0 10px}
+.gbar .gsum{margin:0}
+.f.inline{min-width:280px;max-width:520px;flex:1}
+.loginfo{display:inline-flex;vertical-align:middle;margin-left:4px;color:var(--graph);cursor:help}
+.loginfo .ic{width:15px;height:15px}
+.btn.on{background:var(--mark);border-color:#bfdccd}
+.mrow{grid-template-columns:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.mrow .mnum{width:22px;text-align:right;color:var(--graph);font-variant-numeric:tabular-nums}
+.mrow input.mcode{width:190px}.mrow input.mname{flex:1;min-width:200px}
+.mrow .wbox input{width:52px}
+.pcblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.pch{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:6px}
+.pch small{color:var(--graph)}.pch span{margin-left:auto;font-size:13px}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -330,12 +364,28 @@ function makeDomains(subject) {
   return DOMAIN_PRESETS[key].map(([name, weight]) => ({ id: uid(), name, weight, writing: isWritingName(name) }));
 }
 function newClass({ name, subject, level, regime, year }) {
-  return {
+  const c = {
     id: uid(), name, subject, level: level || 'secundario', regime: regime || 'periodos', year: year || anoLetivo(),
     cumulative: true, levelCuts: [20, 50, 70, 90], writing: { model: level === 'basico' ? 'prova91' : 'exame639' },
     domains: makeDomains(subject), students: [], moments: [], created: new Date().toISOString(),
   };
+  if (c.level === 'profissional') { c.modules = []; c.modMin = 10; }
+  return c;
 }
+// ---------------------------------------------------------------- níveis de ensino e escalas
+// Escala de COTAÇÃO dos instrumentos (pontos por domínio): 3.º ciclo 0–100; secundário e profissional 0–200.
+// Escala da CLASSIFICAÇÃO: 3.º ciclo níveis 1–5; secundário 0–20; profissional 0–20 por módulo/UFCD.
+const isBasic = c => c?.level === 'basico';
+const isProf = c => c?.level === 'profissional';
+const ptsScale = c => isBasic(c) ? 100 : 200;
+const LEVEL_LABEL = { basico: '3.º ciclo (níveis 1 a 5)', secundario: 'Secundário (0 a 20 valores)', profissional: 'Ensino profissional (módulos/UFCD, 0 a 20)' };
+const LEVEL_TAG = { basico: '3.º ciclo · níveis 1–5', secundario: 'Secundário · 0–20', profissional: 'Profissional · módulos 0–20' };
+const levelOptions = sel => [['basico', '3.º ciclo — níveis 1 a 5'], ['secundario', 'Secundário — 0 a 20 valores'], ['profissional', 'Profissional — módulos/UFCD']]
+  .map(([v, l]) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${l}</option>`).join('');
+/** Nota interna (0–20) apresentada na escala do nível: 3.º ciclo em % (= pontos em 100); restantes em valores. */
+const gShow = (c, g) => g === null || g === undefined ? null : isBasic(c) ? g * 5 : g;
+const gUnit = c => isBasic(c) ? '%' : 'val.';
+const scaleText = c => isBasic(c) ? 'Cada domínio avaliado é cotado de 0 a 100 pontos (= %).' : 'Cada domínio avaliado é cotado de 0 a 200 pontos (20 valores).';
 function anoLetivo(d = new Date()) { const y = d.getFullYear(), m = d.getMonth(); return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`; }
 const terms = c => c.regime === 'semestres' ? ['1.º semestre', '2.º semestre'] : ['1.º período', '2.º período', '3.º período'];
 const activeStudents = c => c.students.filter(s => !s.left).sort((a, b) => (a.n || 999) - (b.n || 999) || a.name.localeCompare(b.name, 'pt'));
@@ -833,7 +883,7 @@ function homeHTML() {
   return `<section class="hero"><div><h1>Olá${name}.</h1><p>Escolha uma turma para corrigir testes, lançar notas ou imprimir a pauta.</p></div><button class="btn primary lg" data-new-class>${ic('plus')}Nova turma</button></section>
   <div class="cards">${cls.map(c => {
     const n = activeStudents(c).length; const moms = c.moments.length;
-    return `<button class="ccard" data-open-class="${c.id}"><span class="ctag">${esc(c.level === 'basico' ? '3.º ciclo · níveis 1–5' : 'Secundário · 0–20')}</span><b>${esc(c.name)}</b><span class="csub">${esc(c.subject)} · ${esc(c.year)}</span>
+    return `<button class="ccard" data-open-class="${c.id}"><span class="ctag">${esc(LEVEL_TAG[c.level] || LEVEL_TAG.secundario)}</span><b>${esc(c.name)}</b><span class="csub">${esc(c.subject)} · ${esc(c.year)}</span>
       <span class="cmeta"><span>${ic('users')}${n} aluno${n === 1 ? '' : 's'}</span><span>${ic('test')}${moms} momento${moms === 1 ? '' : 's'}</span></span></button>`;
   }).join('')}</div>`;
 }
@@ -844,18 +894,24 @@ function termTabs(c) {
 }
 function classHTML() {
   const c = cur(); if (view.term >= terms(c).length) view.term = 0;
-  const tabs = [['momentos', 'Momentos de avaliação', 'test'], ['pauta', 'Pauta do período', 'grid'], ['alunos', 'Alunos', 'users'], ['config', 'Editar turma', 'pen']];
+  const prof = isProf(c);
+  const tabs = [['momentos', 'Momentos de avaliação', 'test'], ...(prof ? [] : [['pauta', 'Pauta do período', 'grid']]),
+    ...(prof ? [['grelha', 'Grelha final · Profissional', 'excel']] : isBasic(c) ? [['grelha', 'Grelha final · 3.º ciclo', 'excel']] : []),
+    ['alunos', 'Alunos', 'users'], ['config', 'Editar turma', 'pen']];
+  if ((view.tab === 'pauta' && prof) || (view.tab === 'grelha' && !prof && !isBasic(c))) view.tab = 'momentos';
   const n = activeStudents(c).length; const ws = weightSum(c);
   const warn = !n ? `<div class="alert">${ic('users')}<span><b>Falta a lista de alunos.</b> Cole os nomes ou importe um ficheiro Word, Excel ou PDF.</span><button class="btn primary sm" data-tab="alunos">Adicionar alunos</button></div>`
     : Math.abs(ws - 100) > 0.01 ? `<div class="alert">${ic('sliders')}<span><b>Os pesos dos domínios somam ${fmtMax(ws)}%.</b> Têm de somar 100%.</span><button class="btn primary sm" data-tab="config">Corrigir pesos</button></div>` : '';
   let body = '';
   if (view.tab === 'momentos') body = momentsHTML(c);
   else if (view.tab === 'pauta') body = pautaScreenHTML(c);
+  else if (view.tab === 'grelha') body = prof ? gridProfHTML(c) : gridBasicHTML(c);
   else if (view.tab === 'alunos') body = studentsHTML(c);
   else body = configHTML(c);
-  return `<section class="chead"><div><div class="ctitle"><h1>${esc(c.name)}</h1>${view.tab !== 'config' ? `<button class="btn sm" data-tab="config" title="Corrigir o nome, a disciplina, o nível, os domínios e os pesos">${ic('pen')}Editar turma</button>` : ''}</div><p>${esc(c.subject)} · ${c.level === 'basico' ? '3.º ciclo (níveis 1 a 5)' : 'Secundário (0 a 20 valores)'} · ${esc(c.year)} · ${n} aluno${n === 1 ? '' : 's'}</p></div>
-    ${view.tab === 'momentos' || view.tab === 'pauta' ? termTabs(c) : ''}</section>
-    ${warn}
+  const modWarn = prof && n && !(c.modules || []).length ? `<div class="alert">${ic('sliders')}<span><b>Falta indicar os módulos/UFCD da disciplina.</b> Cada momento de avaliação pertence a um módulo ou UFCD.</span><button class="btn primary sm" data-tab="config">Indicar módulos/UFCD</button></div>` : '';
+  return `<section class="chead"><div><div class="ctitle"><h1>${esc(c.name)}</h1>${view.tab !== 'config' ? `<button class="btn sm" data-tab="config" title="Corrigir o nome, a disciplina, o nível, os domínios e os pesos">${ic('pen')}Editar turma</button>` : ''}</div><p>${esc(c.subject)} · ${LEVEL_LABEL[c.level] || LEVEL_LABEL.secundario} · ${esc(c.year)} · ${n} aluno${n === 1 ? '' : 's'}</p></div>
+    ${prof ? (view.tab === 'momentos' ? modTabs(c) : '') : (view.tab === 'momentos' || view.tab === 'pauta' || view.tab === 'grelha') ? termTabs(c) : ''}</section>
+    ${warn || modWarn}
     <nav class="tabs">${tabs.map(([k, l, i]) => `<button class="${view.tab === k ? 'on' : ''}" data-tab="${k}">${ic(i)}${l}</button>`).join('')}</nav>
     <section class="panel">${body}</section>`;
 }
@@ -872,8 +928,9 @@ function shortName(m) {
 
 // --- momentos
 function momentsHTML(c) {
-  const list = c.moments.filter(m => m.term === view.term).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || a.created - b.created);
-  const T = terms(c)[view.term];
+  const prof = isProf(c); if (prof) fixViewMod(c);
+  const list = c.moments.filter(m => prof ? momentModule(c, m) === view.mod : m.term === view.term).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || a.created - b.created);
+  const T = prof ? modLabel(c, view.mod) : terms(c)[view.term];
   const cards = list.map(m => {
     const p = momentProgress(c, m); const ids = momentDomainIds(c, m);
     const avg = (() => { const v = activeStudents(c).map(s => momentPercent(c, m, s.id)).filter(x => x !== null); return v.length ? sum(v) / v.length : null; })();
@@ -881,7 +938,7 @@ function momentsHTML(c) {
     return `<article class="mcard">
       <button class="mmain" data-open-moment="${m.id}">
         <span class="mshort">${esc(shortName(m))}</span>
-        <span class="minfo"><b>${esc(m.name)}</b><small>${m.date ? new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') + ' · ' : ''}${m.mode === 'perguntas' ? `${m.questions.length} pergunta${m.questions.length === 1 ? '' : 's'}` : 'Nota por domínio (0–' + (m.scale || 200) + ')'}${Number(m.weight) === 2 ? ' · conta a dobrar' : ''}</small>
+        <span class="minfo"><b>${esc(m.name)}</b><small>${m.date ? new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') + ' · ' : ''}${m.mode === 'perguntas' ? `${m.questions.length} pergunta${m.questions.length === 1 ? '' : 's'}` : 'Nota por domínio (0–' + (m.scale || 200) + (Number(m.scale) === 20 ? ' valores' : ' pontos') + ')'}${Number(m.weight) === 2 ? ' · conta a dobrar' : ''}</small>
           <span class="chips">${ids.map(id => `<span class="chip">${esc(c.domains.find(d => d.id === id)?.name)}</span>`).join('')}</span></span>
         <span class="mprog"><span class="bar"><i style="width:${pct}%"></i></span><small>${p.done} de ${p.total} corrigidos${avg !== null ? ` · média ${fmt(avg, 0)}%` : ''}</small></span>
       </button>
@@ -897,14 +954,19 @@ function momentsHTML(c) {
           <button data-del-moment="${m.id}" class="danger">${ic('trash')}<span>Apagar</span></button></div></div>
       </div></article>`;
   }).join('');
-  return `<div class="phead"><div><h2>Momentos de avaliação · ${esc(T)}</h2><p>Testes, trabalhos, fichas, atitudes… Cada domínio avaliado vale 200 pontos (20 valores).</p></div>
-    <button class="btn primary" data-new-moment>${ic('plus')}Novo momento</button></div>
-    ${list.length ? `<div class="mlist">${cards}</div>` : `<div class="empty sm">${ic('test', 'big')}<h3>Ainda não há avaliações no ${esc(T)}</h3><p>Crie um teste para corrigir pergunta a pergunta, ou lance só a nota de cada domínio se já corrigiu em papel.</p><button class="btn primary" data-new-moment>${ic('plus')}Novo momento de avaliação</button></div>`}`;
+  const gridBtn = prof || isBasic(c) ? `<button class="btn" data-tab="grelha">${ic('excel')}Grelha final</button>` : '';
+  return `<div class="phead"><div><h2>Momentos de avaliação · ${esc(T)}</h2><p>Testes, trabalhos, fichas, atitudes… ${scaleText(c)}</p></div>
+    <div class="btnrow">${gridBtn}<button class="btn primary" data-new-moment>${ic('plus')}Novo momento</button></div></div>
+    ${list.length ? `<div class="mlist">${cards}</div>` : `<div class="empty sm">${ic('test', 'big')}<h3>Ainda não há avaliações ${prof ? 'em ' : 'no '}${esc(T)}</h3><p>Crie um teste para corrigir pergunta a pergunta, ou lance só a nota de cada domínio se já corrigiu em papel.</p><button class="btn primary" data-new-moment>${ic('plus')}Novo momento de avaliação</button></div>`}`;
 }
 
 // --- formulário de momento (novo/editar)
 function momentForm(c, existing = null) {
-  const m = existing ? JSON.parse(JSON.stringify(existing)) : { id: uid(), name: '', short: '', term: view.term, date: new Date().toISOString().slice(0, 10), weight: 1, mode: 'perguntas', numbering: 'dominio', questions: [], domainIds: [], scale: 200, scores: {}, rubrics: {}, absent: {}, created: Date.now() };
+  const prof = isProf(c); const S = ptsScale(c);
+  const m = existing ? JSON.parse(JSON.stringify(existing)) : { id: uid(), name: '', short: '', term: prof ? 0 : view.term, date: new Date().toISOString().slice(0, 10), weight: 1, mode: 'perguntas', numbering: 'dominio', questions: [], domainIds: [], scale: S, scores: {}, rubrics: {}, absent: {}, created: Date.now(), ...(prof ? { moduleId: view.mod && view.mod !== '_none' ? view.mod : (c.modules?.[0]?.id || '') } : {}) };
+  // Cotação máxima por domínio = escala do nível (100 ou 200). Momentos antigos com cotação maior mantêm-se (não se perdem notas).
+  const origTot = {}; if (existing?.mode === 'perguntas') for (const q of existing.questions) origTot[q.domainId] = (origTot[q.domainId] || 0) + (Number(q.max) || 0);
+  const limitOf = did => Math.max(S, round(origTot[did] || 0, 2));
   const hasScores = existing && Object.keys(existing.scores || {}).some(k => Object.keys(existing.scores[k] || {}).length);
   // Numeração: «dominio» recomeça em 1 em cada domínio; «seguida» (testes antigos) numera 1, 2, 3… no teste todo.
   const perDomain = () => m.numbering === 'dominio';
@@ -922,9 +984,11 @@ function momentForm(c, existing = null) {
     box.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m.mode));
     const qbox = box.querySelector('#fQuestions');
     if (m.mode === 'dominios') {
+      const opts = isBasic(c) ? [[100, 'pontos (0 a 100)']] : [[200, 'pontos (0 a 200)'], [20, 'valores (0 a 20)']];
+      if (existing && !opts.some(o => o[0] === Number(existing.scale))) opts.push([Number(existing.scale) || 200, `0 a ${Number(existing.scale) || 200} (escala com que este momento foi criado)`]);
+      if (!opts.some(o => o[0] === Number(m.scale))) m.scale = opts[0][0];
       qbox.innerHTML = `<div class="scalepick"><span>Vai introduzir a nota de cada domínio em</span>
-        <label><input type="radio" name="scale" value="200" ${Number(m.scale) !== 20 ? 'checked' : ''}> pontos (0 a 200)</label>
-        <label><input type="radio" name="scale" value="20" ${Number(m.scale) === 20 ? 'checked' : ''}> valores (0 a 20)</label></div>
+        ${opts.map(([v, l]) => `<label><input type="radio" name="scale" value="${v}" ${Number(m.scale) === v ? 'checked' : ''}> ${l}</label>`).join('')}</div>
         <p class="hint">Útil quando corrige em papel: introduz só o resultado final de cada domínio, sem perguntas.${c.domains.some(writingOK) ? ' Na Escrita pode usar a rubrica de exame.' : ''}</p>`;
       return;
     }
@@ -936,19 +1000,21 @@ function momentForm(c, existing = null) {
         <small>Pode também escrever o número que quiser em cada pergunta, igual ao do enunciado (ex.: I.1, II.3, 2.a).</small></div>`;
     qbox.innerHTML = numPick + doms.map(d => {
       const qs = m.questions.filter(q => q.domainId === d.id); const tot = sum(qs.map(q => Number(q.max) || 0));
-      return `<div class="qblock"><div class="qbh"><b>${esc(d.name)}</b><span class="qtot ${Math.abs(tot - 200) < 0.01 ? 'ok' : ''}">${fmtMax(tot)} / 200 pontos</span>
-        <button type="button" class="btn xs" data-split="${d.id}" title="Dividir 200 pontos igualmente">Dividir 200</button><button type="button" class="btn xs" data-addq="${d.id}">${ic('plus')}Pergunta</button></div>
+      const lim = limitOf(d.id);
+      return `<div class="qblock"><div class="qbh"><b>${esc(d.name)}</b><span class="qtot ${tot > lim + 1e-9 ? 'over' : Math.abs(tot - lim) < 0.01 ? 'ok' : ''}" data-lim="${lim}">${fmtMax(tot)} / ${lim} pontos${tot > lim + 1e-9 ? ' — ultrapassa o máximo' : lim > S ? ' (cotação original deste momento)' : ''}</span>
+        <button type="button" class="btn xs" data-split="${d.id}" title="Dividir ${S} pontos igualmente">Dividir ${S}</button><button type="button" class="btn xs" data-addq="${d.id}">${ic('plus')}Pergunta</button></div>
         ${qs.length ? '<div class="qrow qhead"><span class="ql">Pergunta</span><span class="qm">Cotação</span></div>' : ''}${qs.map(q => `<div class="qrow"><input class="ql" data-ql="${q.id}" value="${esc(q.label)}" aria-label="Pergunta" placeholder="N.º">
           <input class="qm" data-qm="${q.id}" value="${esc(q.max)}" inputmode="decimal" aria-label="Cotação"><span class="unit">pontos</span>
           ${writingOK(d) ? `<label class="rubchk"><input type="checkbox" data-qr="${q.id}" ${q.rubric ? 'checked' : ''}>Texto corrigido com a rubrica de exame</label>` : ''}
           <button type="button" class="btn xs icon" data-delq="${q.id}" aria-label="Apagar pergunta">${ic('x')}</button></div>`).join('')}
         </div>`;
-    }).join('') + '<p class="hint">Use «+ Pergunta» para acrescentar perguntas e «Dividir 200» para repartir a cotação igualmente. Cada domínio é sempre convertido para 200 pontos (20 valores).</p>';
+    }).join('') + `<p class="hint">Use «+ Pergunta» para acrescentar perguntas e «Dividir ${S}» para repartir a cotação igualmente. ${isBasic(c) ? '3.º ciclo: cada domínio tem no máximo 100 pontos; o resultado é a percentagem obtida.' : 'Cada domínio tem no máximo 200 pontos (20 valores).'} Se cotar o domínio com menos pontos, a PAUTA calcula a percentagem sobre a cotação que definiu.</p>`;
   };
   const body = `<div class="fgrid">
       <label class="f wide">Nome<input id="fName" value="${esc(m.name)}" placeholder="Ex.: Teste 1, Trabalho de grupo, Atitudes"></label>
       <label class="f">Sigla na pauta<input id="fShort" value="${esc(m.short || '')}" placeholder="${esc(shortName({ ...m, name: m.name || 'Teste 1' }))}" maxlength="5"></label>
-      <label class="f">Período<select id="fTerm">${terms(c).map((t, i) => `<option value="${i}" ${m.term === i ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+      ${prof ? `<label class="f">Módulo / UFCD<select id="fModule"><option value="">— escolher —</option>${(c.modules || []).map(md => `<option value="${md.id}" ${m.moduleId === md.id ? 'selected' : ''}>${esc(modName(md))}</option>`).join('')}</select></label>`
+        : `<label class="f">Período<select id="fTerm">${terms(c).map((t, i) => `<option value="${i}" ${m.term === i ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`}
       <label class="f">Data<input id="fDate" type="date" value="${esc(m.date || '')}"></label>
       <label class="f">Conta na média<select id="fWeight"><option value="1">normal</option><option value="2" ${Number(m.weight) === 2 ? 'selected' : ''}>a dobrar</option></select></label>
     </div>
@@ -967,7 +1033,7 @@ function momentForm(c, existing = null) {
         const mode = e.target.closest('[data-mode]'); if (mode && !hasScores) { const prev = m.mode; m.mode = mode.dataset.mode; if (prev !== m.mode) { if (m.mode === 'dominios') m.domainIds = [...new Set(m.questions.map(q => q.domainId).concat(m._pending || []))]; else { m._pending = m.domainIds.slice(); } } draw(box); return; }
         const nb = e.target.closest('[data-numbering]'); if (nb) { m.numbering = nb.dataset.numbering; autoLabels(); draw(box); return; }
         const add = e.target.closest('[data-addq]'); if (add) { m.questions.push({ id: uid(), label: nextLabel(add.dataset.addq), domainId: add.dataset.addq, max: 0, rubric: false }); sortQuestions(); draw(box); box.querySelector(`[data-qm="${m.questions.find(q => q.domainId === add.dataset.addq && q.max === 0)?.id}"]`)?.focus(); return; }
-        const split = e.target.closest('[data-split]'); if (split) { const qs = m.questions.filter(q => q.domainId === split.dataset.split); const each = Math.floor(200 / qs.length * 10) / 10; qs.forEach((q, i) => q.max = i === qs.length - 1 ? round(200 - each * (qs.length - 1), 1) : each); draw(box); return; }
+        const split = e.target.closest('[data-split]'); if (split) { const qs = m.questions.filter(q => q.domainId === split.dataset.split); const each = Math.floor(S / qs.length * 10) / 10; qs.forEach((q, i) => q.max = i === qs.length - 1 ? round(S - each * (qs.length - 1), 1) : each); draw(box); return; }
         const del = e.target.closest('[data-delq]'); if (del) { m.questions = m.questions.filter(q => q.id !== del.dataset.delq); autoLabels(); draw(box); return; }
       });
       box.addEventListener('change', e => {
@@ -975,7 +1041,7 @@ function momentForm(c, existing = null) {
         if (t.dataset.dom) {
           const id = t.dataset.dom;
           if (m.mode === 'dominios') { m.domainIds = t.checked ? [...new Set([...m.domainIds, id])] : m.domainIds.filter(x => x !== id); }
-          else if (t.checked) { const d = c.domains.find(x => x.id === id); m.questions.push({ id: uid(), label: nextLabel(id), domainId: id, max: 200, rubric: !!(isPortuguese(c) && d.writing) }); sortQuestions(); m._pending = (m._pending || []).filter(x => x !== id); }
+          else if (t.checked) { const d = c.domains.find(x => x.id === id); m.questions.push({ id: uid(), label: nextLabel(id), domainId: id, max: S, rubric: !!(isPortuguese(c) && d.writing) }); sortQuestions(); m._pending = (m._pending || []).filter(x => x !== id); }
           else { if (m.questions.some(q => q.domainId === id && Object.values(m.scores).some(r => isNum(r[q.id])))) { t.checked = true; return mErr('Este domínio já tem pontos lançados. Apague-os primeiro.'); } m.questions = m.questions.filter(q => q.domainId !== id); autoLabels(); m._pending = (m._pending || []).filter(x => x !== id); }
           draw(box); return;
         }
@@ -985,7 +1051,7 @@ function momentForm(c, existing = null) {
       box.addEventListener('input', e => {
         const t = e.target;
         if (t.dataset.ql) m.questions.find(q => q.id === t.dataset.ql).label = t.value;
-        if (t.dataset.qm) { const v = parseNum(t.value); const q = m.questions.find(x => x.id === t.dataset.qm); q.max = Number.isFinite(v) ? v : q.max; t.classList.toggle('bad', !(v > 0)); const b = t.closest('.qblock'); const tot = sum(m.questions.filter(x => x.domainId === q.domainId).map(x => Number(x.max) || 0)); const el = b.querySelector('.qtot'); el.textContent = fmtMax(tot) + ' / 200 pontos'; el.classList.toggle('ok', Math.abs(tot - 200) < 0.01); }
+        if (t.dataset.qm) { const v = parseNum(t.value); const q = m.questions.find(x => x.id === t.dataset.qm); q.max = Number.isFinite(v) ? v : q.max; t.classList.toggle('bad', !(v > 0)); const b = t.closest('.qblock'); const tot = sum(m.questions.filter(x => x.domainId === q.domainId).map(x => Number(x.max) || 0)); const el = b.querySelector('.qtot'); const lim = Number(el.dataset.lim) || S; const over = tot > lim + 1e-9; el.textContent = fmtMax(tot) + ' / ' + lim + ' pontos' + (over ? ' — ultrapassa o máximo' : ''); el.classList.toggle('ok', !over && Math.abs(tot - lim) < 0.01); el.classList.toggle('over', over); t.classList.toggle('bad', !(v > 0) || v > lim + 1e-9); }
         if (t.id === 'fName' && !$('#fShort').value) $('#fShort').placeholder = shortName({ name: t.value || 'Teste 1' });
       });
       function sortQuestions() { const order = c.domains.map(d => d.id); m.questions.sort((a, b) => order.indexOf(a.domainId) - order.indexOf(b.domainId)); autoLabels(); }
@@ -993,17 +1059,19 @@ function momentForm(c, existing = null) {
     actions: [{ label: 'Cancelar' }, {
       label: existing ? 'Guardar alterações' : 'Criar e começar a corrigir', kind: 'primary', run: () => {
         m.name = $('#fName').value.trim(); if (!m.name) return mErr('Escreva o nome (ex.: Teste 1).');
-        m.short = $('#fShort').value.trim(); m.term = Number($('#fTerm').value); m.date = $('#fDate').value; m.weight = Number($('#fWeight').value);
+        m.short = $('#fShort').value.trim(); m.date = $('#fDate').value; m.weight = Number($('#fWeight').value);
+        if (prof) { m.moduleId = $('#fModule').value; if (!m.moduleId && (c.modules || []).length) return mErr('Escolha o módulo ou UFCD deste momento.'); } else m.term = Number($('#fTerm').value);
         if (m.mode === 'perguntas') {
           m.questions = m.questions.filter(q => c.domains.some(d => d.id === q.domainId));
           if (!m.questions.length) return mErr('Escolha pelo menos um domínio.');
           if (m.questions.some(q => !(Number(q.max) > 0))) return mErr('Todas as perguntas precisam de uma cotação maior que zero.');
+          for (const id of new Set(m.questions.map(q => q.domainId))) { const tot = sum(m.questions.filter(q => q.domainId === id).map(q => Number(q.max) || 0)); if (tot > limitOf(id) + 1e-9) return mErr(`«${c.domains.find(d => d.id === id)?.name}» tem ${fmtMax(tot)} pontos: o máximo é ${limitOf(id)} pontos por domínio${isBasic(c) ? ' no 3.º ciclo' : ''}.`); }
           if (m.questions.some(q => !String(q.label).trim())) return mErr('Todas as perguntas precisam de um número (ex.: 1.1).');
           m.domainIds = [];
         } else { if (!m.domainIds.length) return mErr('Escolha pelo menos um domínio.'); m.questions = []; }
         delete m._pending;
         if (existing) Object.assign(existing, m); else c.moments.push(m);
-        changed(); view.term = m.term;
+        changed(); if (prof) view.mod = m.moduleId || '_none'; else view.term = m.term;
         if (existing) render(); else go('moment', { momentId: m.id });
         toast(existing ? 'Momento atualizado.' : 'Momento criado. Pode começar a corrigir.');
       }
@@ -1018,11 +1086,12 @@ function momentHTML() {
   const rubricCell = (sid, key, max) => { const v = scoreOf(m, sid, key); return `<button class="rubbtn ${v !== null ? 'has' : ''}" data-rubric="${sid}|${key}|${max}" title="Corrigir com a rubrica de exame">${v !== null ? fmt(v, 1) : 'Rubrica'}</button>`; };
   let head1 = '<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>', head2 = '';
   if (m.mode === 'perguntas') {
-    for (const id of ids) { const qs = domainQuestions(m, id); head1 += `<th colspan="${qs.length + 1}" class="dg">${esc(D(id).name)}</th>`; head2 += qs.map(q => `<th class="q">${esc(q.label)}<small>${fmtMax(q.max)}</small>${q.rubric ? '' : `<button class="fillbtn" data-fill="${q.id}|${q.max}|${esc(D(id).name + ' · ' + q.label)}" title="Dar a mesma pontuação a todos">Preencher</button>`}</th>`).join('') + `<th class="dt">Domínio<small>/200 · /20</small></th>`; }
+    for (const id of ids) { const qs = domainQuestions(m, id); head1 += `<th colspan="${qs.length + 1}" class="dg">${esc(D(id).name)}</th>`; head2 += qs.map(q => `<th class="q">${esc(q.label)}<small>${fmtMax(q.max)}</small>${q.rubric ? '' : `<button class="fillbtn" data-fill="${q.id}|${q.max}|${esc(D(id).name + ' · ' + q.label)}" title="Dar a mesma pontuação a todos">Preencher</button>`}</th>`).join('') + `<th class="dt">Domínio<small>${isBasic(c) ? '/100 · %' : '/200 · /20'}</small></th>`; }
   } else {
     for (const id of ids) head1 += `<th rowspan="2" class="dg one">${esc(D(id).name)}<small>0 a ${m.scale || 200}${Number(m.scale) === 20 ? ' valores' : ' pontos'}</small><button class="fillbtn" data-fill="${id}|${m.scale || 200}|${esc(D(id).name)}" title="Dar a mesma nota a todos">Preencher</button></th>`;
   }
   head1 += `<th rowspan="2" class="res">Resultado<small>% do teste</small></th><th rowspan="2" class="abs">Faltou</th>`;
+  const modTxt = isProf(c) ? ' · ' + esc(modLabel(c, momentModule(c, m))) : '';
   const rows = students.map(s => {
     const ab = isAbsent(m, s.id); let cells = '';
     if (m.mode === 'perguntas') {
@@ -1040,7 +1109,7 @@ function momentHTML() {
   }).join('');
   const prog = momentProgress(c, m);
   return `<div class="crumbs"><button class="link" data-back-class>${ic('back')}${esc(c.name)} · Momentos de avaliação</button></div>
-  <section class="chead"><div><h1>${esc(m.name)}</h1><p>${esc(terms(c)[m.term])}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · ${m.mode === 'perguntas' ? 'correção pergunta a pergunta' : 'nota final de cada domínio'} · <span id="progTxt">${prog.done} de ${prog.total} corrigidos</span></p></div>
+  <section class="chead"><div><h1>${esc(m.name)}</h1><p>${isProf(c) ? modTxt.slice(3) : esc(terms(c)[m.term])}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · ${m.mode === 'perguntas' ? 'correção pergunta a pergunta' : 'nota final de cada domínio'} · <span id="progTxt">${prog.done} de ${prog.total} corrigidos</span></p></div>
     <div class="btnrow"><button class="btn" data-dup-moment="${m.id}">${ic('copy')}Copiar para outras turmas</button><button class="btn" data-print-blank="${m.id}">${ic('print')}Grelha em branco</button><button class="btn" data-excel-moment="${m.id}">${ic('excel')}Excel</button><button class="btn" data-print-cards="${m.id}">${ic('card')}Fichas dos alunos</button><button class="btn" data-results="${m.id}">${ic('grid')}Resultados ${m.mode === 'perguntas' ? 'por pergunta' : 'por domínio'}</button><button class="btn" data-edit-moment="${m.id}">${ic('sliders')}Editar</button></div></section>
   <p class="tiphint">${ic('check')}Ande com <kbd>Enter</kbd> e as setas <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>. Escreva <kbd>+</kbd> para dar a cotação total. «Preencher» dá a mesma pontuação a todos. Caixa vazia = por corrigir, nunca zero.${m.mode === 'perguntas' && students.some(s => s.medidas) ? ' Alunos com medidas (<span class="medb">A</span>): escreva <kbd>x</kbd> numa pergunta que não se aplica; a cotação do domínio ajusta-se.' : ''}</p>
   ${students.length ? `<div class="tablewrap"><table class="grade" id="gradeTable"><thead><tr>${head1}</tr>${head2 ? `<tr>${head2}</tr>` : ''}</thead><tbody>${rows}</tbody><tfoot id="gradeFoot"></tfoot></table></div>`
@@ -1051,11 +1120,11 @@ function updateRow(c, m, sid) {
   for (const id of momentDomainIds(c, m)) {
     const dt = $(`[data-dt="${sid}|${id}"]`);
     if (dt && domainNA(m, sid, id)) { dt.innerHTML = '<span class="mut">não se aplica</span>'; dt.classList.remove('partial'); }
-    else if (dt) { const r = domainPoints(m, sid, id); dt.innerHTML = r ? `<b>${fmt(r.pts / r.max * 200, 1)}</b><small>${r.complete ? fmt(r.pts / r.max * 20, 1) + ' val.' : 'incompleto'}</small>` : '<span class="mut">—</span>'; dt.classList.toggle('partial', !!r && !r.complete); }
+    else if (dt) { const r = domainPoints(m, sid, id); const S = ptsScale(c); dt.innerHTML = r ? `<b>${fmt(r.pts / r.max * S, 1)}</b><small>${r.complete ? (isBasic(c) ? fmt(r.pts / r.max * 100, 0) + '%' : fmt(r.pts / r.max * 20, 1) + ' val.') : 'incompleto'}</small>` : '<span class="mut">—</span>'; dt.classList.toggle('partial', !!r && !r.complete); }
     const cv = $(`[data-conv="${sid}|${id}"]`);
-    if (cv) { const g = domainGrade(m, sid, id); cv.textContent = g === null ? '' : Number(m.scale) === 20 ? `= ${fmt(g * 10, 0)} pts` : `= ${fmt(g, 1)} val.`; }
+    if (cv) { const g = domainGrade(m, sid, id); cv.textContent = g === null ? '' : isBasic(c) ? (Number(m.scale) === 100 ? `= ${fmt(g * 5, 0)}%` : `= ${fmt(g * 5, 1)} pts /100`) : Number(m.scale) === 20 ? `= ${fmt(g * 10, 0)} pts` : `= ${fmt(g, 1)} val.`; }
   }
-  const res = $(`[data-res="${sid}"]`); if (res) { const p = momentPercent(c, m, sid); res.innerHTML = isAbsent(m, sid) ? '<span class="mut">faltou</span>' : p === null ? '<span class="mut">—</span>' : `<b>${fmt(p, 0)}%</b><small>${fmt(p / 5, 1)} val.</small>`; }
+  const res = $(`[data-res="${sid}"]`); if (res) { const p = momentPercent(c, m, sid); res.innerHTML = isAbsent(m, sid) ? '<span class="mut">faltou</span>' : p === null ? '<span class="mut">—</span>' : `<b>${fmt(p, isBasic(c) ? 1 : 0)}%</b>${isBasic(c) ? '' : `<small>${fmt(p / 5, 1)} val.</small>`}`; }
 }
 function updateFoot(c, m) {
   const f = $('#gradeFoot'); if (!f) return; const st = activeStudents(c).filter(s => !isAbsent(m, s.id));
@@ -1064,8 +1133,8 @@ function updateFoot(c, m) {
   for (const id of momentDomainIds(c, m)) {
     if (m.mode === 'perguntas') {
       cells += domainQuestions(m, id).map(q => { const a = avg(st.map(s => scoreOf(m, s.id, q.id))); return `<td>${a === null ? '' : fmt(a, 1)}</td>`; }).join('');
-      const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td class="dt">${a === null ? '' : `<b>${fmt(a * 10, 1)}</b><small>${fmt(a, 1)} val.</small>`}</td>`;
-    } else { const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td>${a === null ? '' : fmt(a, 1) + ' val.'}</td>`; }
+      const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td class="dt">${a === null ? '' : isBasic(c) ? `<b>${fmt(a * 5, 1)}</b><small>${fmt(a * 5, 0)}%</small>` : `<b>${fmt(a * 10, 1)}</b><small>${fmt(a, 1)} val.</small>`}</td>`;
+    } else { const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td>${a === null ? '' : isBasic(c) ? fmt(a * 5, 1) + '%' : fmt(a, 1) + ' val.'}</td>`; }
   }
   const a = avg(st.map(s => momentPercent(c, m, s.id))); cells += `<td class="res">${a === null ? '' : `<b>${fmt(a, 0)}%</b>`}</td><td></td>`;
   f.innerHTML = `<tr>${cells}</tr>`;
@@ -1127,7 +1196,7 @@ function momentResults(c, m) {
 function printResults(c, m, rows) {
   const perQ = m.mode === 'perguntas';
   const body = rows.map(r => `<tr><td class="nm">${esc(r.domain)}</td><td>${perQ ? esc(r.label) : ''}</td><td>${fmtMax(r.max)}</td><td>${r.avg === null ? '' : fmt(r.avg, 1)}</td><td><b>${r.pct === null ? '' : fmt(r.pct, 0) + '%'}</b>${r.pct !== null && r.pct < RES_LOW ? ' ▲' : ''}</td><td>${r.n}</td><td>${r.n ? r.zeros : ''}</td><td>${r.n ? r.full : ''}</td></tr>`).join('');
-  printDoc(`<div class="pdoc" style="--fs:10pt">${docHeader(c, 'Resultados ' + (perQ ? 'por pergunta' : 'por domínio') + ' — ' + m.name, terms(c)[m.term] + (m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''))}
+  printDoc(`<div class="pdoc" style="--fs:10pt">${docHeader(c, 'Resultados ' + (perQ ? 'por pergunta' : 'por domínio') + ' — ' + m.name, momentWhen(c, m) + (m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''))}
     <table class="pt"><thead><tr><th class="nm">Domínio</th><th>${perQ ? 'Pergunta' : ''}</th><th>Cotação</th><th>Média</th><th>Acerto</th><th>Alunos</th><th>Com 0</th><th>Com a cotação toda</th></tr></thead><tbody>${body}</tbody></table>
     <footer class="pf"><span>Acerto = média da turma ÷ cotação. ▲ = menos de ${RES_LOW}% de acerto. Os alunos que faltaram não contam.${licenseLine() ? ' <b>' + esc(licenseLine()) + '.</b>' : ''}</span>${pautaMark()}</footer></div>`, { landscape: false, title: 'Resultados ' + m.name });
 }
@@ -1146,7 +1215,7 @@ function openRubric(sid, key, max) {
     const partsTxt = Object.entries(sc.parts).map(([k, v]) => `${k} ${v === null ? '·' : v}`).join(' + ');
     box.querySelector('#rubTotal').innerHTML = sc.total === null
       ? `<span class="mut">Escolha os níveis e indique o número de erros.</span><small>${partsTxt}</small>`
-      : `<b>${fmtMax(sc.total)} / ${R.max}</b><span>= <b>${fmt(sc.total / R.max * max, 1)}</b> de ${fmtMax(max)} pontos (${fmt(sc.total / R.max * 20, 1)} valores)</span><small>${partsTxt}${sc.note ? ' · ' + sc.note : ''}${(sc.parts.A === 0 || sc.parts.B === 0) ? ' · A ou B com 0: todos os parâmetros a 0.' : ''}</small>`;
+      : `<b>${fmtMax(sc.total)} / ${R.max}</b><span>= <b>${fmt(sc.total / R.max * max, 1)}</b> de ${fmtMax(max)} pontos (${isBasic(c) ? fmt(sc.total / R.max * 100, 0) + '%' : fmt(sc.total / R.max * 20, 1) + ' valores'})</span><small>${partsTxt}${sc.note ? ' · ' + sc.note : ''}${(sc.parts.A === 0 || sc.parts.B === 0) ? ' · A ou B com 0: todos os parâmetros a 0.' : ''}</small>`;
   };
   const students = activeStudents(c).filter(x => !isAbsent(m, x.id)); const idx = students.findIndex(x => x.id === sid); const next = students[idx + 1];
   const save = () => { const sc = R.score({ ...r, limits }); m.rubrics ||= {}; m.rubrics[sid] ||= {}; m.rubrics[sid][key] = { ...r }; m.scores[sid] ||= {}; if (sc.total === null) delete m.scores[sid][key]; else m.scores[sid][key] = round(sc.total / R.max * max, 1); changed(); };
@@ -1156,7 +1225,7 @@ function openRubric(sid, key, max) {
     onOpen: box => {
       draw(box);
       box.addEventListener('click', e => { const b = e.target.closest('[data-lv]'); if (b) { r[b.dataset.lv] = Number(b.dataset.pts); draw(box); } });
-      box.addEventListener('input', e => { const k = e.target.dataset.err; if (k) { const v = parseNum(e.target.value); if (v === null) delete r[k]; else if (Number.isFinite(v) && v >= 0) r[k] = Math.floor(v); const sc = R.score({ ...r, limits }); box.querySelector('#rubTotal').innerHTML = sc.total === null ? '<span class="mut">Escolha os níveis e indique o número de erros.</span>' : `<b>${fmtMax(sc.total)} / ${R.max}</b><span>= <b>${fmt(sc.total / R.max * max, 1)}</b> de ${fmtMax(max)} pontos (${fmt(sc.total / R.max * 20, 1)} valores)</span><small>${sc.note || ''}</small>`; } });
+      box.addEventListener('input', e => { const k = e.target.dataset.err; if (k) { const v = parseNum(e.target.value); if (v === null) delete r[k]; else if (Number.isFinite(v) && v >= 0) r[k] = Math.floor(v); const sc = R.score({ ...r, limits }); box.querySelector('#rubTotal').innerHTML = sc.total === null ? '<span class="mut">Escolha os níveis e indique o número de erros.</span>' : `<b>${fmtMax(sc.total)} / ${R.max}</b><span>= <b>${fmt(sc.total / R.max * max, 1)}</b> de ${fmtMax(max)} pontos (${isBasic(c) ? fmt(sc.total / R.max * 100, 0) + '%' : fmt(sc.total / R.max * 20, 1) + ' valores'})</span><small>${sc.note || ''}</small>`; } });
     },
     actions: [{ label: 'Limpar', run: () => { for (const k of Object.keys(r)) delete r[k]; save(); render(); } },
       ...(next ? [{ label: `Guardar e seguinte (${esc(next.name.split(' ')[0])})`, run: () => { save(); render(); setTimeout(() => openRubric(next.id, key, max), 10); } }] : []),
@@ -1199,20 +1268,21 @@ function pautaScreenHTML(c) {
   const cols = c.domains.map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
   const basic = c.level === 'basico'; const tn = sid => c.termNotes?.[t]?.[sid] || {};
   const scaleOpts = (sel, ph) => `<option value="">${ph}</option>` + (basic ? [1, 2, 3, 4, 5] : Array.from({ length: 21 }, (_, i) => i)).map(v => `<option ${Number(sel) === v && isNum(sel) ? 'selected' : ''}>${v}</option>`).join('');
-  const head1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 2}" class="dg">${esc(d.name)}<small>peso ${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="${basic ? 3 : 2}" class="dg fin">Proposta</th><th colspan="3" class="dg fin2">Decisão do professor</th>`;
-  const head2 = cols.map(({ ms }) => ms.map(m => `<th class="q" title="${esc(m.name)}">${esc(shortName(m))}${m.term !== t ? `<small>${m.term + 1}.º</small>` : ''}</th>`).join('') + '<th class="dt">Média</th><th class="dt">Pond.</th>').join('') + `<th class="fin">/20</th><th class="fin">%</th>${basic ? '<th class="fin">Nível</th>' : ''}<th class="fin2">Autoavaliação</th><th class="fin2">${basic ? 'Nível final' : 'Classificação final'}</th><th class="fin2">Observações</th>`;
+  const head1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 2}" class="dg">${esc(d.name)}<small>peso ${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="2" class="dg fin">Proposta</th><th colspan="3" class="dg fin2">Decisão do professor</th>`;
+  const head2 = cols.map(({ ms }) => ms.map(m => `<th class="q" title="${esc(m.name)}">${esc(shortName(m))}${m.term !== t ? `<small>${m.term + 1}.º</small>` : ''}</th>`).join('') + '<th class="dt">Média</th><th class="dt">Pond.</th>').join('') + `${basic ? '<th class="fin">%</th><th class="fin">Nível</th>' : '<th class="fin">/20</th><th class="fin">%</th>'}<th class="fin2">Autoavaliação</th><th class="fin2">${basic ? 'Nível final' : 'Classificação final'}</th><th class="fin2">Observações</th>`;
   const rows = students.map(s => {
     const fg = finalGrade(c, s, t);
     return `<tr><td class="n">${s.n || ''}</td><td class="nm">${esc(s.name)}${medBadge(s)}</td>${cols.map(({ d, ms }) => {
       const g = domainTermGrade(c, s, d.id, t);
-      return ms.map(m => { const x = domainGrade(m, s.id, d.id); return `<td>${isAbsent(m, s.id) ? '<span class="mut">F</span>' : fmt(x, 1)}</td>`; }).join('') + `<td class="dt"><b>${fmt(g, 1)}</b></td><td class="dt">${g === null ? '—' : fmt(g * d.weight / 100, 2)}</td>`;
-    }).join('')}<td class="fin"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin">${fg ? fmt(fg.pct, 0) + '%' : '—'}</td>${basic ? `<td class="fin"><b>${fg ? basicLevel(c, fg.pct) : '—'}</b></td>` : ''}
+      return ms.map(m => { const x = domainGrade(m, s.id, d.id); return `<td>${isAbsent(m, s.id) ? '<span class="mut">F</span>' : fmt(gShow(c, x), basic ? 0 : 1)}</td>`; }).join('') + `<td class="dt"><b>${fmt(gShow(c, g), 1)}</b></td><td class="dt">${g === null ? '—' : fmt(gShow(c, g) * d.weight / 100, 2)}</td>`;
+    }).join('')}${basic ? `<td class="fin"><b>${fg ? fmt(fg.pct, 0) + '%' + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin"><b>${fg ? basicLevel(c, fg.pct) : '—'}</b></td>`
+      : `<td class="fin"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin">${fg ? fmt(fg.pct, 0) + '%' : '—'}</td>`}
       <td class="tn"><select data-tn="${s.id}|self" aria-label="Autoavaliação de ${esc(s.name)}">${scaleOpts(tn(s.id).self, '—')}</select></td>
       <td class="tn"><select class="final" data-tn="${s.id}|final" aria-label="Classificação final de ${esc(s.name)}">${scaleOpts(tn(s.id).final, fg ? 'Proposta: ' + (basic ? basicLevel(c, fg.pct) : Math.round(fg.v20)) : '—')}</select></td>
       <td class="tn"><input data-tn="${s.id}|obs" value="${esc(tn(s.id).obs || '')}" placeholder="Opcional" aria-label="Observações de ${esc(s.name)}"></td></tr>`;
   }).join('');
   const missing = new Map(); students.forEach(s => (finalGrade(c, s, t)?.missing || c.domains.filter(d => Number(d.weight) > 0).map(d => d.name)).forEach(x => missing.set(x, (missing.get(x) || 0) + 1)));
-  return `<div class="phead"><div><h2>Pauta do ${esc(T)}</h2><p>Por domínio: a nota de cada momento (0–20), a média e o valor ponderado pelo peso. A PAUTA calcula a proposta; à direita regista a autoavaliação, a classificação final que decide e observações.${c.cumulative && t > 0 ? ' Inclui os momentos dos períodos anteriores (avaliação contínua).' : ''}</p></div>
+  return `<div class="phead"><div><h2>Pauta do ${esc(T)}</h2><p>Por domínio: a nota de cada momento (${basic ? 'em %' : '0–20'}), a média e o valor ponderado pelo peso. A PAUTA calcula a proposta; à direita regista a autoavaliação, a classificação final que decide e observações.${c.cumulative && t > 0 ? ' Inclui os momentos dos períodos anteriores (avaliação contínua).' : ''}</p></div>
     <div class="btnrow"><button class="btn primary" data-print-pauta>${ic('print')}Imprimir pauta (A4, 30 alunos)</button><button class="btn" data-excel-pauta>${ic('excel')}Excel</button><button class="btn" data-inovar>${ic('check')}Passar para o Inovar</button></div></div>
     ${distributionHTML(c, t)}
     ${missing.size ? `<div class="alert soft">${ic('help')}<span>Notas em falta: ${[...missing].map(([d, n]) => `<b>${esc(d)}</b> (${n === students.length ? 'todos os alunos' : n + ' aluno' + (n === 1 ? '' : 's')})`).join(', ')}. Nesses casos a classificação (assinalada com *) é calculada com os restantes domínios, redistribuindo os pesos.</span></div>` : ''}
@@ -1263,11 +1333,11 @@ function configHTML(c) {
     <label class="f">Nome<input data-cfg="name" value="${esc(c.name)}"></label>
     <label class="f">Disciplina<input data-cfg="subject" value="${esc(c.subject)}"></label>
     <label class="f">Ano letivo<input data-cfg="year" value="${esc(c.year)}"></label>
-    <label class="f">Nível de ensino<select data-cfg="level"><option value="basico" ${c.level === 'basico' ? 'selected' : ''}>3.º ciclo — níveis 1 a 5</option><option value="secundario" ${c.level !== 'basico' ? 'selected' : ''}>Secundário — 0 a 20 valores</option></select></label>
-    <label class="f">Organização<select data-cfg="regime"><option value="periodos">3 períodos</option><option value="semestres" ${c.regime === 'semestres' ? 'selected' : ''}>2 semestres</option></select></label>
-    <label class="f check"><input type="checkbox" data-cfg="cumulative" ${c.cumulative ? 'checked' : ''}><span>Avaliação contínua<small>A pauta do 2.º período inclui também os momentos do 1.º, etc.</small></span></label>
+    <label class="f">Nível de ensino<select data-cfg="level">${levelOptions(c.level)}</select></label>
+    <label class="f" ${isProf(c) ? 'hidden' : ''}>Organização<select data-cfg="regime"><option value="periodos">3 períodos</option><option value="semestres" ${c.regime === 'semestres' ? 'selected' : ''}>2 semestres</option></select></label>
+    <label class="f check" ${isProf(c) ? 'hidden' : ''}><input type="checkbox" data-cfg="cumulative" ${c.cumulative ? 'checked' : ''}><span>Avaliação contínua<small>A pauta do 2.º período inclui também os momentos do 1.º, etc.</small></span></label>
   </div></section>
-  <section><h2>Domínios e pesos <span class="wsum ${Math.abs(ws - 100) < 0.01 ? 'ok' : 'bad'}">${fmtMax(ws)}%</span></h2><p class="hint">Os pesos têm de somar 100%. Cada domínio é avaliado em 200 pontos (20 valores).</p>
+  <section><h2>Domínios e pesos <span class="wsum ${Math.abs(ws - 100) < 0.01 ? 'ok' : 'bad'}">${fmtMax(ws)}%</span></h2><p class="hint">Os pesos têm de somar 100%. ${scaleText(c)}${isProf(c) ? ' No ensino profissional, a classificação de cada módulo/UFCD resulta destes domínios e pesos, só com os momentos desse módulo.' : ''}</p>
     <div class="dlist">${c.domains.map(d => `<div class="drow"><input data-dname="${d.id}" value="${esc(d.name)}" aria-label="Domínio"><span class="wbox"><input data-dweight="${d.id}" value="${fmtMax(d.weight)}" inputmode="decimal" aria-label="Peso"><span>%</span></span>
       ${isPortuguese(c) ? `<label class="rubchk"><input type="checkbox" data-dwriting="${d.id}" ${d.writing ? 'checked' : ''}>Escrita (rubrica)</label>` : ''}<button class="btn xs icon" data-del-domain="${d.id}" aria-label="Apagar domínio">${ic('trash')}</button></div>`).join('')}</div>
     <button class="btn sm" data-add-domain>${ic('plus')}Acrescentar domínio</button></section>
@@ -1275,6 +1345,7 @@ function configHTML(c) {
     <label class="f wide">Modelo<select data-cfg="writingModel"><option value="exame639" ${R.id === 'exame639' ? 'selected' : ''}>Exame Nacional 639 (secundário) — A, B, C + correção linguística · 44 pontos</option><option value="prova91" ${R.id === 'prova91' ? 'selected' : ''}>Prova Final 91 (9.º ano) — A, B, C, D, E · 20 pontos</option></select></label>
     <label class="f">Mínimo de palavras<input data-wlim="0" value="${lim[0]}" inputmode="numeric"></label><label class="f">Máximo de palavras<input data-wlim="1" value="${lim[1]}" inputmode="numeric"></label></div>
     <p class="hint">${R.id === 'exame639' ? 'Correção linguística pela tabela oficial de erros tipo A (pontuação, ortografia, morfologia, citação) e tipo B (sintaxe, impropriedade lexical). Fora dos limites: −1 por palavra (máx. −5); menos de 80 palavras: 0.' : 'Ortografia: 0–4 erros → 4 · 5–10 → 3 · 11–16 → 1. Extensão: até 24 palavras fora dos limites −1; mais −2; menos de 55 palavras: 0.'} Se A ou B tiver 0, todos os parâmetros ficam a 0.</p></section>` : ''}
+  ${isProf(c) ? modulesCfgHTML(c) : ''}
   ${c.level === 'basico' ? `<section><h2>Níveis (3.º ciclo)</h2><p class="hint">Percentagem mínima para cada nível, de acordo com os critérios da escola.</p><div class="levels-cfg">${[2, 3, 4, 5].map((lv, i) => `<label class="f">Nível ${lv} a partir de<span class="wbox"><input data-cut="${i}" value="${c.levelCuts[i]}" inputmode="numeric"><span>%</span></span></label>`).join('')}</div></section>` : ''}
   <section><h2>Nova turma igual a esta</h2><p class="hint">Cria outra turma com os mesmos domínios, pesos e critérios (e, se quiser, os mesmos testes ou alunos). Útil para outra turma do mesmo ano ou para o ano letivo seguinte.</p><button class="btn" data-new-class-from="${c.id}">${ic('copy')}Criar turma a partir desta</button></section>
   <section class="danger-zone"><h2>Apagar turma</h2><p class="hint">Apaga a turma, os alunos e todas as notas. Guarde antes uma cópia de segurança.</p><button class="btn danger" data-del-class>${ic('trash')}Apagar esta turma</button></section></div>`;
@@ -1299,18 +1370,20 @@ function helpHTML() {
   return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página.</p></div></section>
   <section class="panel help">
   <ol class="steps">
-    <li><b>Crie a turma</b> e escolha o nível: 3.º ciclo (níveis 1–5) ou secundário (0–20). Os domínios e pesos vêm preenchidos; ajuste-os em «Editar turma» (têm de somar 100%).</li>
+    <li><b>Crie a turma</b> e escolha o nível: 3.º ciclo (níveis 1–5, cotações de 0 a 100 pontos), secundário (0–20, cotações de 0 a 200) ou ensino profissional (módulos/UFCD de 0 a 20, cotações de 0 a 200). Os domínios e pesos vêm preenchidos; ajuste-os em «Editar turma» (têm de somar 100%).</li>
     <li><b>Adicione os alunos</b>: cole a lista ou importe Word, Excel ou PDF.</li>
     <li><b>Crie um momento de avaliação</b> (teste, trabalho, atitudes…) e escolha como vai corrigir:
-      <ul><li><b>Pergunta a pergunta</b>: define as cotações de cada domínio (normalmente 200 pontos por domínio) e introduz os pontos de cada aluno.</li>
-      <li><b>Só a nota de cada domínio</b>: corrigiu em papel e introduz apenas o resultado final de cada domínio, em pontos (0–200) ou valores (0–20).</li></ul></li>
+      <ul><li><b>Pergunta a pergunta</b>: define as cotações de cada domínio (até 100 pontos no 3.º ciclo; até 200 no secundário e no profissional) e introduz os pontos de cada aluno.</li>
+      <li><b>Só a nota de cada domínio</b>: corrigiu em papel e introduz apenas o resultado final de cada domínio, em pontos (0–100 no 3.º ciclo; 0–200 ou 0–20 valores no secundário e no profissional).</li></ul></li>
     <li><b>Mesmo teste noutras turmas</b>: «Copiar para outras turmas» copia perguntas e cotações (sem notas) para as turmas que marcar.</li>
     <li><b>Lançar pontos depressa</b>: ande com <kbd>Enter</kbd> e as setas; escreva <kbd>+</kbd> para dar a cotação total; «Preencher» dá a mesma pontuação a toda a coluna.</li>
     <li><b>Para corrigir em papel</b>, imprima a <b>Grelha em branco</b>: nomes dos alunos, perguntas e cotações, com linhas para 30 alunos.</li>
     <li><b>Escrita (Português)</b>: marque a pergunta como «texto corrigido com a rubrica». Em cada aluno clica no nível de cada parâmetro e escreve o número de erros; a PAUTA aplica os critérios do Exame 639 ou da Prova Final 91 e converte para a cotação.</li>
-    <li><b>Resultado do teste</b>: cada domínio vale 200 pontos (20 valores). O resultado em % é a média dos domínios avaliados nesse teste. Ex.: Leitura 150/200, Gramática 120/200, Ed. Literária 170/200 → (75% + 60% + 85%) ÷ 3 = <b>73%</b>. As «Fichas dos alunos» imprimem isto para entregar.</li>
+    <li><b>Resultado do teste</b>: no secundário e no profissional cada domínio vale 200 pontos (20 valores); no 3.º ciclo vale 100 pontos (= %). O resultado em % é a média dos domínios avaliados nesse teste. Ex.: Leitura 150/200, Gramática 120/200, Ed. Literária 170/200 → (75% + 60% + 85%) ÷ 3 = <b>73%</b>. As «Fichas dos alunos» imprimem isto para entregar.</li>
     <li><b>Excel</b>: cada momento tem o seu Excel (perguntas, domínios, % e valores). A pauta do período também.</li>
     <li><b>Pauta do período</b>: mostra, por domínio, a nota de cada momento, a média e o valor ponderado pelo peso; depois a proposta em 20 e em % (e o nível). À direita regista a <b>autoavaliação</b>, a <b>classificação final</b> que decide (pode ser diferente da proposta) e <b>observações</b>. Imprime em A4 com 30 linhas.</li>
+    <li><b>Grelha final · 3.º ciclo</b> (separador da turma): reúne sozinha todos os alunos e avaliações, mostra o resultado de cada domínio, a percentagem global, a proposta de nível (1 a 5) e a evolução de período para período. O professor valida a proposta ou ajusta o nível; cada alteração fica registada. Exporta para Excel e PDF.</li>
+    <li><b>Ensino profissional</b>: em «Editar turma» indique os módulos/UFCD da disciplina; cada momento de avaliação pertence a um módulo. A <b>Grelha final · Profissional</b> calcula a classificação de cada módulo (0 a 20) com os domínios e pesos da turma, mostra os módulos concluídos, não concluídos e em avaliação, o percurso de cada aluno e a grelha global da turma. Exporta para Excel e PDF.</li>
   </ol>
   <h2>Como é calculada a classificação</h2>
   <p>Nota do domínio no período = média das notas desse domínio nos momentos do período (um momento «a dobrar» conta duas vezes). Classificação = soma de (nota do domínio × peso). Exemplo: Leitura 15 × 20% + Escrita 12 × 25% + … Se um domínio ainda não tiver notas, os pesos dos restantes são redistribuídos e a pauta avisa. No 3.º ciclo o nível resulta da percentagem (limiares em «Editar turma»).</p>
@@ -1366,9 +1439,9 @@ function printBlank(c, m) {
   const fs = ncols > 26 ? 7 : ncols > 18 ? 8 : 9;
   const writing = m.mode === 'perguntas' && m.questions.some(q => q.rubric);
   const R = rubricFor(c);
-  printDoc(`<div class="pdoc" style="--fs:${fs}pt">${docHeader(c, 'Grelha de correção — ' + m.name, terms(c)[m.term] + (m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''))}
+  printDoc(`<div class="pdoc" style="--fs:${fs}pt">${docHeader(c, 'Grelha de correção — ' + m.name, momentWhen(c, m) + (m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''))}
     <table class="pt blank"><thead><tr>${h1}</tr>${h2 ? `<tr>${h2}</tr>` : ''}</thead><tbody>${rows}</tbody></table>
-    <footer class="pf"><span>Cada domínio é convertido para 200 pontos (20 valores). % do teste = média dos domínios avaliados.${licenseLine() ? ' <b>' + esc(licenseLine()) + '.</b>' : ''}${writing ? ` Escrita: ${esc(R.name)} — ${R.params.map(p => p.key + ' ' + p.name).join(' · ')} · ${R.errors.map(e => e.name).join(' · ')} (máx. ${R.max}).` : ''}</span>${pautaMark()}</footer></div>`, { landscape: ncols > 8, title: 'Grelha ' + m.name });
+    <footer class="pf"><span>${isBasic(c) ? 'Cada domínio é cotado até 100 pontos (resultado em %).' : 'Cada domínio é convertido para 200 pontos (20 valores).'} % do teste = média dos domínios avaliados.${licenseLine() ? ' <b>' + esc(licenseLine()) + '.</b>' : ''}${writing ? ` Escrita: ${esc(R.name)} — ${R.params.map(p => p.key + ' ' + p.name).join(' · ')} · ${R.errors.map(e => e.name).join(' · ')} (máx. ${R.max}).` : ''}</span>${pautaMark()}</footer></div>`, { landscape: ncols > 8, title: 'Grelha ' + m.name });
 }
 
 // ---------------------------------------------------------------- pauta do período (A4, 30 alunos)
@@ -1376,20 +1449,20 @@ function printPauta(c, t) {
   const moms = termMoments(c, t); const st = padRows(activeStudents(c));
   const cols = c.domains.map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
   const basic = c.level === 'basico';
-  const ncols = sum(cols.map(x => x.ms.length + 2)) + (basic ? 3 : 2) + 2; const tn = sid => c.termNotes?.[t]?.[sid] || {};
+  const ncols = sum(cols.map(x => x.ms.length + 2)) + 2 + 2; const tn = sid => c.termNotes?.[t]?.[sid] || {};
   const fs = ncols > 34 ? 6.5 : ncols > 28 ? 7 : ncols > 22 ? 7.5 : ncols > 16 ? 8 : 9;
-  const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 2}" class="dom">${esc(d.name)}<small>${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="${basic ? 3 : 2}" class="fin">Proposta</th><th rowspan="2" class="dec">Auto-<br>aval.</th><th rowspan="2" class="dec">${basic ? 'Nível<br>final' : 'Classif.<br>final'}</th>`;
-  const h2 = cols.map(({ ms }) => ms.map(m => `<th>${esc(shortName(m))}</th>`).join('') + '<th class="avg">Média</th><th class="pond">Pond.</th>').join('') + `<th class="fin">/20</th><th class="fin">%</th>${basic ? '<th class="fin">Nível</th>' : ''}`;
+  const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 2}" class="dom">${esc(d.name)}<small>${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="2" class="fin">Proposta</th><th rowspan="2" class="dec">Auto-<br>aval.</th><th rowspan="2" class="dec">${basic ? 'Nível<br>final' : 'Classif.<br>final'}</th>`;
+  const h2 = cols.map(({ ms }) => ms.map(m => `<th>${esc(shortName(m))}</th>`).join('') + '<th class="avg">Média</th><th class="pond">Pond.</th>').join('') + (basic ? '<th class="fin">%</th><th class="fin">Nível</th>' : '<th class="fin">/20</th><th class="fin">%</th>');
   const rows = st.map(s => {
-    if (!s) return `<tr><td class="n"></td><td class="nm"></td>${cols.map(({ ms }) => ms.map(() => '<td></td>').join('') + '<td class="avg"></td><td class="pond"></td>').join('')}<td class="fin"></td><td class="fin"></td>${basic ? '<td class="fin"></td>' : ''}<td class="dec"></td><td class="dec"></td></tr>`;
+    if (!s) return `<tr><td class="n"></td><td class="nm"></td>${cols.map(({ ms }) => ms.map(() => '<td></td>').join('') + '<td class="avg"></td><td class="pond"></td>').join('')}<td class="fin"></td><td class="fin"></td><td class="dec"></td><td class="dec"></td></tr>`;
     const fg = finalGrade(c, s, t);
-    return `<tr><td class="n">${s.n || ''}</td><td class="nm">${esc(s.name)}</td>${cols.map(({ d, ms }) => { const g = domainTermGrade(c, s, d.id, t); return ms.map(m => `<td>${isAbsent(m, s.id) ? 'F' : isNum(domainGrade(m, s.id, d.id)) ? fmt(domainGrade(m, s.id, d.id), 1) : ''}</td>`).join('') + `<td class="avg">${g === null ? '' : fmt(g, 1)}</td><td class="pond">${g === null ? '' : fmt(g * d.weight / 100, 2)}</td>`; }).join('')}
-      <td class="fin"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : ''}</b></td><td class="fin">${fg ? fmt(fg.pct, 0) : ''}</td>${basic ? `<td class="fin"><b>${fg ? basicLevel(c, fg.pct) : ''}</b></td>` : ''}<td class="dec">${isNum(tn(s.id).self) ? tn(s.id).self : ''}</td><td class="dec"><b>${isNum(tn(s.id).final) ? tn(s.id).final : ''}</b></td></tr>`;
+    return `<tr><td class="n">${s.n || ''}</td><td class="nm">${esc(s.name)}</td>${cols.map(({ d, ms }) => { const g = domainTermGrade(c, s, d.id, t); return ms.map(m => `<td>${isAbsent(m, s.id) ? 'F' : isNum(domainGrade(m, s.id, d.id)) ? fmt(gShow(c, domainGrade(m, s.id, d.id)), basic ? 0 : 1) : ''}</td>`).join('') + `<td class="avg">${g === null ? '' : fmt(gShow(c, g), 1)}</td><td class="pond">${g === null ? '' : fmt(gShow(c, g) * d.weight / 100, 2)}</td>`; }).join('')}
+      ${basic ? `<td class="fin"><b>${fg ? fmt(fg.pct, 0) + (fg.missing.length ? '*' : '') : ''}</b></td><td class="fin"><b>${fg ? basicLevel(c, fg.pct) : ''}</b></td>` : `<td class="fin"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : ''}</b></td><td class="fin">${fg ? fmt(fg.pct, 0) : ''}</td>`}<td class="dec">${isNum(tn(s.id).self) ? tn(s.id).self : ''}</td><td class="dec"><b>${isNum(tn(s.id).final) ? tn(s.id).final : ''}</b></td></tr>`;
   }).join('');
   const legend = moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${m.term !== t ? ' (' + esc(terms(c)[m.term]) + ')' : ''}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ');
   printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Pauta de avaliação — ' + terms(c)[t], basic ? 'Níveis 1 a 5' : 'Classificações de 0 a 20 valores')}
     <table class="pt"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${rows}</tbody></table>
-    <footer class="pf"><span>${legend || 'Sem momentos de avaliação.'}<br>${distributionLine(c, t) ? '<b>' + esc(distributionLine(c, t)) + '.</b><br>' : ''}Notas de 0 a 20. Média = média do domínio no período. Pond. = média × peso do domínio. Classificação = soma das ponderações (* = falta a nota de algum domínio; os pesos dos restantes são redistribuídos)${basic ? ` · Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%` : ''}. F = faltou.</span>
+    <footer class="pf"><span>${legend || 'Sem momentos de avaliação.'}<br>${distributionLine(c, t) ? '<b>' + esc(distributionLine(c, t)) + '.</b><br>' : ''}${basic ? 'Resultados em % (0 a 100)' : 'Notas de 0 a 20'}. Média = média do domínio no período. Pond. = média × peso do domínio. Classificação = soma das ponderações (* = falta a nota de algum domínio; os pesos dos restantes são redistribuídos)${basic ? ` · Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%` : ''}. F = faltou.</span>
     <span class="sign">O(A) professor(a): ______________________________ &nbsp; Data: ____/____/______<br><small class="plic">${esc(licenseLine())}</small> ${pautaMark()}</span></footer></div>`, { landscape: true, title: 'Pauta ' + c.name + ' ' + terms(c)[t] });
 }
 
@@ -1399,10 +1472,10 @@ function printCards(c, m) {
   const st = activeStudents(c).filter(s => !isAbsent(m, s.id));
   const cards = st.map(s => {
     const p = momentPercent(c, m, s.id);
-    return `<div class="card"><div class="cardh">${pautaMark()}<b>${esc(m.name)}</b><span>${esc(c.subject)} · ${esc(c.name)} · ${esc(terms(c)[m.term])}</span></div>
+    return `<div class="card"><div class="cardh">${pautaMark()}<b>${esc(m.name)}</b><span>${esc(c.subject)} · ${esc(c.name)} · ${esc(momentWhen(c, m))}</span></div>
       <div class="cardn">${s.n ? s.n + '. ' : ''}${esc(s.name)}</div>
-      <table><thead><tr><th>Domínio</th><th>Pontos</th><th>Valores</th><th>%</th></tr></thead><tbody>${ids.map(id => { const r = domainPoints(m, s.id, id); const g = domainGrade(m, s.id, id); return `<tr><td>${esc(D(id).name)}</td><td>${r ? fmt(r.pts / r.max * 200, 1) + ' / 200' : '—'}</td><td>${fmt(g, 1)}</td><td>${g === null ? '—' : fmt(g * 5, 0) + '%'}</td></tr>`; }).join('')}</tbody></table>
-      <div class="cardr"><span>Resultado do teste</span><b>${p === null ? '—' : fmt(p, 0) + '%'}</b><small>${p === null ? '' : '(' + fmt(p / 5, 1) + ' valores) · média dos ' + ids.length + ' domínio' + (ids.length === 1 ? '' : 's') + ' avaliado' + (ids.length === 1 ? '' : 's')}</small></div></div>`;
+      <table><thead><tr><th>Domínio</th><th>Pontos</th>${isBasic(c) ? '' : '<th>Valores</th>'}<th>%</th></tr></thead><tbody>${ids.map(id => { const r = domainPoints(m, s.id, id); const g = domainGrade(m, s.id, id); return `<tr><td>${esc(D(id).name)}</td><td>${r ? fmt(r.pts / r.max * ptsScale(c), 1) + ' / ' + ptsScale(c) : '—'}</td>${isBasic(c) ? '' : `<td>${fmt(g, 1)}</td>`}<td>${g === null ? '—' : fmt(g * 5, 0) + '%'}</td></tr>`; }).join('')}</tbody></table>
+      <div class="cardr"><span>Resultado do teste</span><b>${p === null ? '—' : fmt(p, 0) + '%'}</b><small>${p === null ? '' : (isBasic(c) ? '' : '(' + fmt(p / 5, 1) + ' valores) · ') + 'média dos ' + ids.length + ' domínio' + (ids.length === 1 ? '' : 's') + ' avaliado' + (ids.length === 1 ? '' : 's')}</small></div></div>`;
   }).join('');
   printDoc(`<div class="pdoc cards">${cards || '<p>Sem alunos com resultados.</p>'}</div>`, { landscape: false, title: 'Fichas ' + m.name });
 }
@@ -1425,25 +1498,26 @@ async function saveSheet(rows, name, file, { widths = [], merges = [] } = {}) {
 async function excelMoment(c, m) {
   const ids = momentDomainIds(c, m); const D = id => c.domains.find(d => d.id === id);
   const t = APP.state.teacher;
-  const rows = [[`${m.name} — ${c.subject} — Turma ${c.name}`], [`${t.school || ''}${t.school ? ' · ' : ''}${terms(c)[m.term]}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · Ano letivo ${c.year}`], []];
+  const rows = [[`${m.name} — ${c.subject} — Turma ${c.name}`], [`${t.school || ''}${t.school ? ' · ' : ''}${momentWhen(c, m)}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · Ano letivo ${c.year}`], []];
   const head = ['N.º', 'Nome'];
   if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) head.push(`${D(id).name} · ${q.label} (${fmtMax(q.max)})`);
-  for (const id of ids) head.push(`${D(id).name} (/200)`, `${D(id).name} (/20)`);
-  head.push('Teste (%)', 'Teste (/20)', 'Observação');
+  const B = isBasic(c), S = ptsScale(c);
+  for (const id of ids) head.push(`${D(id).name} (/${S})`, B ? `${D(id).name} (%)` : `${D(id).name} (/20)`);
+  head.push('Teste (%)', ...(B ? [] : ['Teste (/20)']), 'Observação');
   rows.push(head);
   for (const s of activeStudents(c)) {
     const r = [s.n || '', s.name];
     if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) r.push(isNA(m, s.id, q.id) ? 'n/a' : n1(scoreOf(m, s.id, q.id)));
-    for (const id of ids) { const g = domainGrade(m, s.id, id); r.push(g === null ? '' : n1(g * 10), n1(g)); }
-    const p = momentPercent(c, m, s.id); r.push(p === null ? '' : round(p, 1), p === null ? '' : round(p / 5, 1), isAbsent(m, s.id) ? 'Faltou' : p === null ? 'Por corrigir' : '');
+    for (const id of ids) { const g = domainGrade(m, s.id, id); r.push(g === null ? '' : n1(g * S / 20), g === null ? '' : n1(B ? g * 5 : g)); }
+    const p = momentPercent(c, m, s.id); r.push(p === null ? '' : round(p, 1), ...(B ? [] : [p === null ? '' : round(p / 5, 1)]), isAbsent(m, s.id) ? 'Faltou' : p === null ? 'Por corrigir' : '');
     rows.push(r);
   }
   const st = activeStudents(c).filter(s => !isAbsent(m, s.id)); const avg = f => { const v = st.map(f).filter(x => x !== null); return v.length ? round(sum(v) / v.length, 2) : ''; };
   const foot = ['', 'Média da turma'];
   if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) foot.push(avg(s => scoreOf(m, s.id, q.id)));
-  for (const id of ids) foot.push(avg(s => { const g = domainGrade(m, s.id, id); return g === null ? null : g * 10; }), avg(s => domainGrade(m, s.id, id)));
-  foot.push(avg(s => momentPercent(c, m, s.id)), avg(s => { const p = momentPercent(c, m, s.id); return p === null ? null : p / 5; }));
-  rows.push([], foot, [], ['Cada domínio é avaliado em 200 pontos (20 valores). O resultado do teste em % é a média dos domínios avaliados.']);
+  for (const id of ids) foot.push(avg(s => { const g = domainGrade(m, s.id, id); return g === null ? null : g * S / 20; }), avg(s => { const g = domainGrade(m, s.id, id); return g === null ? null : B ? g * 5 : g; }));
+  foot.push(avg(s => momentPercent(c, m, s.id)), ...(B ? [] : [avg(s => { const p = momentPercent(c, m, s.id); return p === null ? null : p / 5; })]));
+  rows.push([], foot, [], [B ? 'Cada domínio é avaliado em 100 pontos (resultado em %). O resultado do teste em % é a média dos domínios avaliados.' : 'Cada domínio é avaliado em 200 pontos (20 valores). O resultado do teste em % é a média dos domínios avaliados.']);
   await saveSheet(rows, m.name, `PAUTA_${safeName(c.name)}_${safeName(m.name)}.xlsx`, { widths: [5, 32, ...head.slice(2).map(h => Math.min(26, Math.max(10, h.length * 0.8)))] });
   toast('Excel guardado nas Transferências. Contém dados de alunos: guarde-o com cuidado.');
 }
@@ -1454,17 +1528,17 @@ async function excelPauta(c, t) {
   const rows = [[`Pauta de avaliação — ${terms(c)[t]} — ${c.subject} — Turma ${c.name}`], [`${tch.school || ''}${tch.school ? ' · ' : ''}Ano letivo ${c.year}${tch.name ? ' · Prof. ' + tch.name : ''}`], []];
   const h1 = ['N.º', 'Nome'], h2 = ['', '']; const merges = [];
   for (const { d, ms } of cols) { merges.push({ s: { r: 3, c: h1.length }, e: { r: 3, c: h1.length + ms.length + 1 } }); h1.push(`${d.name} (${fmtMax(d.weight)}%)`); for (let i = 0; i < ms.length + 1; i++) h1.push(''); ms.forEach(m => h2.push(shortName(m))); h2.push('Média', 'Ponderada'); }
-  h1.push('Proposta', '', ...(basic ? [''] : []), 'Autoavaliação', basic ? 'Nível final' : 'Classificação final', 'Observações', 'Cálculo'); h2.push('/20', '%', ...(basic ? ['Nível'] : []), '', '', '', '');
-  merges.push({ s: { r: 3, c: h1.length - (basic ? 7 : 6) }, e: { r: 3, c: h1.length - 5 } });
+  h1.push('Proposta', '', 'Autoavaliação', basic ? 'Nível final' : 'Classificação final', 'Observações', 'Cálculo'); h2.push(...(basic ? ['%', 'Nível'] : ['/20', '%']), '', '', '', '');
+  merges.push({ s: { r: 3, c: h1.length - 6 }, e: { r: 3, c: h1.length - 5 } });
   rows.push(h1, h2);
   for (const s of activeStudents(c)) {
     const r = [s.n || '', s.name];
-    for (const { d, ms } of cols) { ms.forEach(m => r.push(isAbsent(m, s.id) ? 'F' : n1(domainGrade(m, s.id, d.id)))); const g = domainTermGrade(c, s, d.id, t); r.push(n1(g), g === null ? '' : round(g * d.weight / 100, 3)); }
-    const fg = finalGrade(c, s, t); r.push(fg ? round(fg.v20, 2) : '', fg ? round(fg.pct, 1) : ''); if (basic) r.push(fg ? basicLevel(c, fg.pct) : ''); const nt = c.termNotes?.[t]?.[s.id] || {}; r.push(isNum(nt.self) ? nt.self : '', isNum(nt.final) ? nt.final : '', nt.obs || '', fg?.missing.length ? 'Sem nota em: ' + fg.missing.join(', ') : '');
+    for (const { d, ms } of cols) { ms.forEach(m => r.push(isAbsent(m, s.id) ? 'F' : n1(gShow(c, domainGrade(m, s.id, d.id))))); const g = domainTermGrade(c, s, d.id, t); r.push(n1(gShow(c, g)), g === null ? '' : round(gShow(c, g) * d.weight / 100, 3)); }
+    const fg = finalGrade(c, s, t); if (basic) r.push(fg ? round(fg.pct, 1) : '', fg ? basicLevel(c, fg.pct) : ''); else r.push(fg ? round(fg.v20, 2) : '', fg ? round(fg.pct, 1) : ''); const nt = c.termNotes?.[t]?.[s.id] || {}; r.push(isNum(nt.self) ? nt.self : '', isNum(nt.final) ? nt.final : '', nt.obs || '', fg?.missing.length ? 'Sem nota em: ' + fg.missing.join(', ') : '');
     rows.push(r);
   }
   rows.push([], ['Legenda: ' + moms.map(m => `${shortName(m)} = ${m.name}${m.term !== t ? ' (' + terms(c)[m.term] + ')' : ''}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ')]);
-  rows.push(['Notas de 0 a 20. Ponderada = média × peso do domínio. Classificação = soma das ponderadas (pesos redistribuídos se faltar algum domínio).']);
+  rows.push([(basic ? 'Resultados em % (0 a 100).' : 'Notas de 0 a 20.') + ' Ponderada = média × peso do domínio. Classificação = soma das ponderadas (pesos redistribuídos se faltar algum domínio).']);
   await saveSheet(rows, 'Pauta ' + terms(c)[t], `PAUTA_${safeName(c.name)}_${safeName(terms(c)[t])}.xlsx`, { widths: [5, 32, ...h2.slice(2, -4).map(() => 9), 13, 16, 36, 30], merges });
   toast('Excel da pauta guardado nas Transferências.');
 }
@@ -1837,7 +1911,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.0.3';
+const PAUTA_VERSAO = '3.1.0';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -1984,12 +2058,9 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
-  'Novo botão «Editar turma», sempre à vista: corrija o nome, a disciplina, o nível, os domínios e os pesos sem perder as notas.',
-  'A numeração das perguntas recomeça em cada domínio (ou fica seguida, como preferir). Pode também escrever I.1, II.3, 2.a…',
-  'Resultados por pergunta: a média da turma em cada pergunta, com as mais difíceis a laranja. Pode imprimir.',
-  'Nova turma a partir de outra: copia os domínios, os pesos e os critérios e, se quiser, os testes e a lista de alunos.',
-  'Na pauta do período: distribuição das classificações, percentagem de positivas e média da turma.',
-  'Alunos com medidas de suporte: ficam assinalados com «A» e, nos testes, pode marcar com x as perguntas que não se aplicam.',
+  '3.º ciclo: as cotações dos instrumentos passam a ser de 0 a 100 pontos por domínio (secundário e profissional continuam de 0 a 200). Não é possível ultrapassar a cotação máxima.',
+  '3.º ciclo: resultados apresentados em % (sem conversões para valores) e nova Grelha final de avaliação, com validação ou ajuste do nível, registo das alterações, evolução por período, Excel e PDF.',
+  'Novo nível «Ensino profissional»: módulos/UFCD, classificação de cada módulo de 0 a 20, módulos concluídos, não concluídos e em avaliação, percurso de cada aluno e grelha global da turma.',
 ];
 async function mostrarNovidades(then) {
   let visto = null; try { visto = localStorage.getItem('pautaNovidades'); localStorage.setItem('pautaNovidades', PAUTA_VERSAO); } catch (e) { }
@@ -2054,11 +2125,13 @@ function copyClassSetup(src, dest, { moments = false, students = false } = {}) {
   dest.domains = src.domains.map(d => { const id = uid(); map[d.id] = id; return { ...JSON.parse(JSON.stringify(d)), id }; });
   dest.levelCuts = (src.levelCuts || [20, 50, 70, 90]).slice(); dest.cumulative = src.cumulative !== false;
   dest.writing = JSON.parse(JSON.stringify(src.writing || { model: dest.level === 'basico' ? 'prova91' : 'exame639' }));
+  const mmap = {}; if (src.modules?.length) { dest.modules = src.modules.map(x => { const id = uid(); mmap[x.id] = id; return { ...x, id }; }); dest.modMin = isNum(src.modMin) ? src.modMin : 10; }
   if (moments) dest.moments = src.moments.map(m => {
     const n = JSON.parse(JSON.stringify(m)); n.id = uid(); n.created = Date.now() + Math.random(); n.scores = {}; n.rubrics = {}; n.absent = {}; n.na = {};
     n.questions = (n.questions || []).filter(q => map[q.domainId]).map(q => ({ ...q, id: uid(), domainId: map[q.domainId] }));
     n.domainIds = (n.domainIds || []).filter(id => map[id]).map(id => map[id]);
     if (n.term >= terms(dest).length) n.term = terms(dest).length - 1;
+    if (n.moduleId) n.moduleId = mmap[n.moduleId] || '';
     return n;
   });
   if (students) dest.students = activeStudents(src).map(x => ({ id: uid(), n: x.n, name: x.name, ...(x.medidas ? { medidas: true, medidasNota: x.medidasNota || '' } : {}) }));
@@ -2072,7 +2145,7 @@ function newClassDialog(fromId = '') {
   modal({ title: fromId ? 'Nova turma a partir de outra' : 'Nova turma', body: `${askTeacher ? `<div class="fgrid"><label class="f">O seu nome<input id="ncTeacher" placeholder="Aparece nas pautas impressas"></label><label class="f">Escola / agrupamento<input id="ncSchool" placeholder="Opcional"></label></div><div class="sep"></div>` : ''}<div class="fgrid">
       <label class="f">Turma<input id="ncName" placeholder="Ex.: 9.º C"></label>
       <label class="f">Disciplina<input id="ncSubject" list="subjects" value="Português"><datalist id="subjects"><option>Português</option><option>PLNM</option><option>Matemática</option><option>Inglês</option><option>História</option><option>Geografia</option></datalist></label>
-      <label class="f">Nível de ensino<select id="ncLevel"><option value="basico">3.º ciclo — níveis 1 a 5</option><option value="secundario">Secundário — 0 a 20 valores</option></select></label>
+      <label class="f">Nível de ensino<select id="ncLevel">${levelOptions('basico')}</select></label>
       <label class="f">Organização do ano<select id="ncRegime"><option value="periodos">3 períodos</option><option value="semestres">2 semestres</option></select></label>
       <label class="f">Ano letivo<input id="ncYear" value="${esc(anoLetivo())}"></label></div>
       ${fromSel}
@@ -2080,7 +2153,7 @@ function newClassDialog(fromId = '') {
     onOpen: () => {
       if (askTeacher) setTimeout(() => $('#ncTeacher')?.focus(), 40);
       const last = cls.at(-1); if (last) { $('#ncSubject').value = last.subject; $('#ncLevel').value = last.level; $('#ncRegime').value = last.regime; } else { $('#ncLevel').value = 'basico'; }
-      $('#ncName').addEventListener('input', e => { if (/1[012]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'secundario'; else if (/[789]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'basico'; });
+      $('#ncName').addEventListener('input', e => { if ($('#ncLevel').value === 'profissional') return; if (/1[012]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'secundario'; else if (/[789]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'basico'; });
       const fromChange = () => {
         const src = cls.find(c => c.id === $('#ncFrom')?.value); $('#ncCopyOpts') && ($('#ncCopyOpts').hidden = !src);
         if (src) { $('#ncSubject').value = src.subject; $('#ncLevel').value = src.level; $('#ncRegime').value = src.regime; $('#ncHint').textContent = `Fica com os mesmos domínios, pesos, limiares dos níveis e critérios da escrita da turma ${src.name}. Pode alterá-los depois em «Editar turma».`; }
@@ -2218,6 +2291,7 @@ function duplicateMoment(c, m) {
         if (missing) { fail.push(`${dest.name} (não tem o domínio «${missing}»)`); continue; }
         const n = JSON.parse(JSON.stringify(m)); n.id = uid(); n.created = Date.now(); n.term = Math.min(Number($('#dupT').value), terms(dest).length - 1); n.scores = {}; n.rubrics = {}; n.absent = {};
         n.questions.forEach(q => { q.id = uid(); q.domainId = map[q.domainId]; }); n.domainIds = n.domainIds.map(id => map[id]);
+        if (n.moduleId || isProf(dest)) { const sm = (c.modules || []).find(x => x.id === n.moduleId); const dm = sm && dest !== c ? (dest.modules || []).find(x => normalize(modName(x)) === normalize(modName(sm))) : sm; n.moduleId = dm ? dm.id : ''; }
         if (dest === c) n.name += ' (cópia)';
         dest.moments.push(n); ok.push(dest.name);
       }
@@ -2242,7 +2316,10 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target; const c = cur();
-  if (t.dataset.tn) { const [sid, k] = t.dataset.tn.split('|'); const tt = view.term; c.termNotes ||= {}; c.termNotes[tt] ||= {}; const row = (c.termNotes[tt][sid] ||= {}); const v = t.value.trim(); if (v === '') delete row[k]; else row[k] = k === 'obs' ? v : Number(v.replace(',', '.')); changed(); if (k === 'final') { const box = $('.dist'); const h = distributionHTML(c, tt); if (box && h) box.outerHTML = h; } return; }
+  if (t.dataset.tn) { const [sid, k] = t.dataset.tn.split('|'); const tt = view.term; c.termNotes ||= {}; c.termNotes[tt] ||= {}; const row = (c.termNotes[tt][sid] ||= {}); const v = t.value.trim(); const before = row[k];
+    if (v === '') delete row[k]; else row[k] = k === 'obs' ? v : Number(v.replace(',', '.'));
+    if (k === 'final' && before !== row[k]) { const prop = proposalOf(c, c.students.find(x => x.id === sid), tt); logFinal(row, before, row[k], prop, row[k] === prop ? 'validar' : 'ajuste'); }
+    changed(); if (view.tab === 'grelha') return render(); if (k === 'final') { const box = $('.dist'); const h = distributionHTML(c, tt); if (box && h) box.outerHTML = h; } return; }
   if (t.dataset.absent) { const m = curMoment(); m.absent ||= {}; if (t.checked) m.absent[t.dataset.absent] = true; else delete m.absent[t.dataset.absent]; changed(); render(); return; }
   if (t.dataset.sn) { const s = c.students.find(x => x.id === t.dataset.sn); const v = parseInt(t.value, 10); s.n = Number.isFinite(v) ? v : null; changed(); render(); return; }
   if (t.dataset.medidas) { const s = c.students.find(x => x.id === t.dataset.medidas); if (t.checked) s.medidas = true; else { delete s.medidas; delete s.medidasNota; } changed(); render(); return; }
@@ -2252,7 +2329,8 @@ document.addEventListener('change', async e => {
     if (k === 'cumulative') c.cumulative = t.checked;
     else if (k === 'writingModel') c.writing = { ...(c.writing || {}), model: t.value };
     else if (k === 'regime') { if (t.value === 'semestres' && c.moments.some(m => m.term > 1)) { t.value = c.regime; return toast('Há momentos no 3.º período: mude-os de período antes.'); } c.regime = t.value; }
-    else if (k === 'level') { c.level = t.value; c.writing = { ...(c.writing || {}), model: t.value === 'basico' ? 'prova91' : 'exame639' }; toast(t.value === 'basico' ? 'Escala 1–5 e rubrica da Prova Final 91.' : 'Escala 0–20 e rubrica do Exame 639.'); }
+    else if (k === 'level') { c.level = t.value; c.writing = { ...(c.writing || {}), model: t.value === 'basico' ? 'prova91' : 'exame639' }; if (t.value === 'profissional') { c.modules ||= []; if (!isNum(c.modMin)) c.modMin = 10; }
+      toast(t.value === 'basico' ? 'Níveis 1–5, cotações de 0 a 100 pontos e rubrica da Prova Final 91. As notas já lançadas mantêm-se.' : t.value === 'profissional' ? 'Ensino profissional: módulos/UFCD de 0 a 20, cotações de 0 a 200. Indique os módulos/UFCD.' : 'Escala 0–20, cotações de 0 a 200 pontos e rubrica do Exame 639.', 5000); }
     else if (t.tagName === 'SELECT') c[k] = t.value;
     changed(); render(); return;
   }
@@ -2290,6 +2368,438 @@ document.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('beforeunload', e => { if (!APP.demo && APP.key && (APP.version !== APP.savedVersion || APP.saving)) { e.preventDefault(); e.returnValue = ''; } });
+
+// =====================================================================================
+// PAUTA — ensino profissional (módulos/UFCD) e grelhas finais (3.º ciclo e profissional).
+// As grelhas são sempre calculadas a partir dos momentos de avaliação já lançados:
+// não guardam cópias das notas (qualquer alteração numa avaliação reflete-se logo).
+// Só ficam guardadas as decisões do professor (validação/ajuste) e o respetivo registo.
+// =====================================================================================
+
+// ---------------------------------------------------------------- módulos / UFCD
+const modName = md => [md?.code, md?.name].map(x => String(x || '').trim()).filter(Boolean).join(' — ') || 'Módulo sem nome';
+const modLegend = md => md?.code && md?.name ? `${String(md.code).trim()} = ${String(md.name).trim()}` : modName(md);
+const modShort = md => String(md?.code || '').trim() || String(md?.name || '').trim().slice(0, 12) || 'Módulo';
+const momentModule = (c, m) => m.moduleId && (c.modules || []).some(x => x.id === m.moduleId) ? m.moduleId : '_none';
+function modLabel(c, id) { if (id === '_none') return 'Sem módulo atribuído'; return modName((c.modules || []).find(x => x.id === id)); }
+const momentWhen = (c, m) => isProf(c) ? modLabel(c, momentModule(c, m)) : terms(c)[m.term];
+const hasUnassigned = c => c.moments.some(m => momentModule(c, m) === '_none');
+function fixViewMod(c) {
+  const ids = (c.modules || []).map(x => x.id);
+  if (view.mod === '_none' && (hasUnassigned(c) || !ids.length)) return;
+  if (!ids.includes(view.mod)) view.mod = ids[0] || '_none';
+}
+function modTabs(c) {
+  fixViewMod(c);
+  const list = (c.modules || []).map(md => [md.id, modShort(md), modName(md)]);
+  if (hasUnassigned(c) || !list.length) list.push(['_none', 'Sem módulo', 'Momentos sem módulo atribuído']);
+  return `<div class="seg modseg" role="tablist" aria-label="Módulo / UFCD">${list.map(([id, l, t]) => `<button role="tab" class="${view.mod === id ? 'on' : ''}" data-mod="${id}" title="${esc(t)}">${esc(l)}</button>`).join('')}</div>`;
+}
+function modulesCfgHTML(c) {
+  const used = id => c.moments.some(m => m.moduleId === id);
+  return `<section><h2>Módulos / UFCD</h2><p class="hint">Indique os módulos ou UFCD desta disciplina, pela ordem do plano de formação. Cada momento de avaliação pertence a um módulo/UFCD; a classificação de cada módulo (0 a 20) é calculada só com os seus momentos, com os domínios e pesos acima. Não são aplicadas as regras dos períodos letivos.</p>
+    <div class="dlist modlist">${(c.modules || []).map((md, i) => `<div class="drow mrow"><span class="mnum">${i + 1}</span><input class="mcode" data-mcode="${md.id}" value="${esc(md.code || '')}" placeholder="Código (ex.: UFCD 6655, Módulo 3)" aria-label="Código"><input class="mname" data-mname="${md.id}" value="${esc(md.name || '')}" placeholder="Designação" aria-label="Designação"><span class="wbox"><input data-mhours="${md.id}" value="${esc(md.hours ?? '')}" inputmode="numeric" aria-label="Horas"><span>h</span></span>
+      <button class="btn xs icon" data-mmove="${md.id}|-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn xs icon" data-mmove="${md.id}|1" aria-label="Descer" ${i === c.modules.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="btn xs icon" data-del-module="${md.id}" aria-label="Apagar módulo" ${used(md.id) ? 'title="Tem momentos de avaliação"' : ''}>${ic('trash')}</button></div>`).join('') || '<p class="hint">Ainda não há módulos/UFCD.</p>'}</div>
+    <div class="btnrow left"><button class="btn sm" data-add-module>${ic('plus')}Acrescentar módulo/UFCD</button><button class="btn sm" data-paste-modules>${ic('copy')}Colar lista de módulos/UFCD</button></div>
+    <div class="fgrid" style="margin-top:12px"><label class="f">Módulo concluído com classificação igual ou superior a<span class="wbox"><input data-modmin value="${esc(isNum(c.modMin) ? c.modMin : 10)}" inputmode="decimal" aria-label="Classificação mínima"><span>valores</span></span></label></div></section>`;
+}
+
+// ---------------------------------------------------------------- cálculos por módulo (mesma regra da pauta: média ponderada pelos pesos dos domínios)
+function moduleMoments(c, mid) {
+  return c.moments.filter(m => momentModule(c, m) === mid).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || a.created - b.created);
+}
+function moduleDomainGrade(c, sid, did, moms) {
+  const e = moms.filter(m => momentDomainIds(c, m).includes(did)).map(m => ({ g: domainGrade(m, sid, did), w: Number(m.weight) || 1 })).filter(x => x.g !== null);
+  return e.length ? sum(e.map(x => x.g * x.w)) / sum(e.map(x => x.w)) : null;
+}
+/** Classificação de um módulo (0–20): {v20, missing, pending, doms} ou null. pending = há momentos do módulo por corrigir neste aluno. */
+function moduleGrade(c, s, mid, moms = moduleMoments(c, mid)) {
+  if (!moms.length) return null;
+  const doms = c.domains.filter(d => Number(d.weight) > 0 && moms.some(m => momentDomainIds(c, m).includes(d.id)));
+  const parts = doms.map(d => ({ d, g: moduleDomainGrade(c, s.id, d.id, moms) }));
+  const withG = parts.filter(p => p.g !== null); if (!withG.length) return null;
+  const W = sum(withG.map(p => Number(p.d.weight)));
+  const pending = moms.some(m => !isAbsent(m, s.id) && momentPercent(c, m, s.id) === null);
+  return { v20: sum(withG.map(p => p.g * Number(p.d.weight))) / W, missing: parts.filter(p => p.g === null).map(p => p.d.name), pending, doms: parts };
+}
+const modMin = c => isNum(c.modMin) ? Number(c.modMin) : 10;
+/** Estado de um aluno num módulo. A classificação só conta como final depois de validada pelo professor. */
+function modStatus(c, s, mid, moms) {
+  const val = c.modFinals?.[mid]?.[s.id];
+  const g = moduleGrade(c, s, mid, moms); const prop = g ? Math.round(g.v20) : null;
+  if (val && isNum(val.v)) { const last = (val.log || []).at(-1); return { st: Number(val.v) >= modMin(c) - 1e-9 ? 'ok' : 'nok', v: Number(val.v), prop, g, val, stale: !!last && last.proposta !== prop }; }
+  return { st: 'eval', v: null, prop, g, val: val || null };
+}
+const ST_LABEL = { ok: 'Concluído', nok: 'Não concluído', eval: 'Em avaliação' };
+const stBadge = (st, extra = '') => `<span class="stb ${st}">${ST_LABEL[st]}${extra}</span>`;
+
+// ---------------------------------------------------------------- registo das decisões do professor
+function logFinal(row, from, to, prop, how = '') {
+  row.log = (row.log || []).concat({ at: new Date().toISOString(), de: isNum(from) ? Number(from) : null, para: isNum(to) ? Number(to) : null, proposta: isNum(prop) ? Number(prop) : null, how }).slice(-30);
+}
+function proposalOf(c, s, t) { if (!s) return null; const fg = finalGrade(c, s, t); return fg ? (isBasic(c) ? basicLevel(c, fg.pct) : Math.round(fg.v20)) : null; }
+const fmtWhen = iso => { try { return new Date(iso).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; } };
+function logText(log) {
+  return (log || []).map(l => `${fmtWhen(l.at)}: ${l.para === null ? 'decisão retirada' : l.how === 'validar' || (l.para === l.proposta && l.how !== 'ajuste') ? `validada a proposta (${l.para})` : `ajustada para ${l.para}${l.proposta !== null ? ` (proposta ${l.proposta})` : ''}`}${l.de !== null && l.para !== null ? ` — antes ${l.de}` : ''}`).join('\n');
+}
+
+// ---------------------------------------------------------------- GRELHA FINAL — 3.º CICLO
+/** Linha da grelha de um aluno num período: tudo calculado a partir dos registos existentes. */
+function basicRow(c, s, t) {
+  const fg = finalGrade(c, s, t); const nt = c.termNotes?.[t]?.[s.id] || {};
+  const prop = fg ? basicLevel(c, fg.pct) : null; const fin = isNum(nt.final) ? Number(nt.final) : null;
+  const st = fin === null ? (prop === null ? 'none' : 'prop') : fin === prop ? 'val' : 'adj';
+  const lastLog = (nt.log || []).at(-1); const stale = fin !== null && !!lastLog && lastLog.proposta !== prop;   // a proposta mudou depois da decisão (alguma avaliação foi alterada)
+  return { s, fg, prop, fin, st, stale, nt, doms: c.domains.map(d => ({ d, g: domainTermGrade(c, s, d.id, t) })) };
+}
+function basicEvolution(c, s) {
+  return terms(c).map((T, i) => { const nt = c.termNotes?.[i]?.[s.id] || {}; if (isNum(nt.final)) return { v: Number(nt.final), dec: true }; const p = proposalOf(c, s, i); return p === null ? null : { v: p, dec: false }; });
+}
+function criteriaGaps(c, t, rows) {
+  const out = []; const ws = weightSum(c);
+  if (Math.abs(ws - 100) > 0.01) out.push(`os pesos dos domínios somam ${fmtMax(ws)}% (têm de somar 100%)`);
+  if (isBasic(c) && !(Array.isArray(c.levelCuts) && c.levelCuts.length === 4 && c.levelCuts.every(isNum))) out.push('os limiares dos níveis 2 a 5');
+  const moms = termMoments(c, t);
+  const noEval = c.domains.filter(d => Number(d.weight) > 0 && !moms.some(m => momentDomainIds(c, m).includes(d.id))).map(d => d.name);
+  if (noEval.length) out.push(`sem avaliações registadas em: ${noEval.join(', ')} (peso redistribuído pelos restantes)`);
+  const none = rows.filter(r => !r.fg).length; if (none) out.push(`${none} aluno(s) ainda sem resultados`);
+  return out;
+}
+function gridBasicHTML(c) {
+  const t = view.term; const T = terms(c); const students = activeStudents(c); const last = t === T.length - 1;
+  const rows = students.map(s => basicRow(c, s, t)); const moms = termMoments(c, t); const inst = !!view.gInst;
+  const cols = c.domains.map(d => ({ d, ms: inst ? moms.filter(m => momentDomainIds(c, m).includes(d.id)) : [] }));
+  const gaps = criteriaGaps(c, t, rows);
+  const n = { val: rows.filter(r => r.st === 'val').length, adj: rows.filter(r => r.st === 'adj').length, prop: rows.filter(r => r.st === 'prop').length };
+  const evoHead = T.map((x, i) => `<th class="evo ${i === t ? 'cur' : ''}">${i + 1}.º${T.length === 2 ? ' S' : ' P'}</th>`).join('');
+  const head1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 1}" class="dg">${esc(d.name)}<small>peso ${fmtMax(d.weight)}%</small></th>`).join('')
+    + `<th colspan="2" class="dg fin">Proposta</th><th colspan="2" class="dg fin2">Decisão do professor</th><th colspan="${T.length}" class="dg">Evolução (nível)</th>`;
+  const head2 = cols.map(({ ms }) => ms.map(m => `<th class="q" title="${esc(m.name)}">${esc(shortName(m))}${m.term !== t ? `<small>${m.term + 1}.º</small>` : ''}</th>`).join('') + '<th class="dt">%</th>').join('')
+    + `<th class="fin">Global</th><th class="fin">Nível</th><th class="fin2">Nível final</th><th class="fin2">Estado</th>${evoHead}`;
+  const body = rows.map(r => {
+    const evo = basicEvolution(c, r.s);
+    const evoCells = evo.map((e, i) => { const prev = evo.slice(0, i).reverse().find(Boolean); const arrow = e && prev ? (e.v > prev.v ? '<i class="up">▲</i>' : e.v < prev.v ? '<i class="dn">▼</i>' : '') : ''; return `<td class="evo ${i === t ? 'cur' : ''}">${e ? `<span class="${e.dec ? '' : 'mut'}" title="${e.dec ? 'Nível decidido' : 'Proposta (ainda não decidida)'}">${e.v}</span>${arrow}` : '<span class="mut">—</span>'}</td>`; }).join('');
+    const stCell = r.stale ? `<span class="stb eval" title="${esc(logText(r.nt.log))}">Rever · proposta agora ${r.prop ?? '—'}</span>` : r.st === 'val' ? '<span class="stb ok">Validado</span>' : r.st === 'adj' ? `<span class="stb adj" title="${esc(logText(r.nt.log))}">Ajustado · proposta ${r.prop ?? '—'}</span>` : r.st === 'prop' ? `<button class="btn xs" data-tnok="${r.s.id}">${ic('check')}Validar ${r.prop}</button>` : '<span class="mut">—</span>';
+    return `<tr><td class="n">${r.s.n || ''}</td><td class="nm">${esc(r.s.name)}${medBadge(r.s)}</td>${cols.map(({ d, ms }, k) => ms.map(m => { const x = domainGrade(m, r.s.id, d.id); return `<td>${isAbsent(m, r.s.id) ? '<span class="mut">F</span>' : fmt(gShow(c, x), 0)}</td>`; }).join('') + `<td class="dt"><b>${fmt(gShow(c, r.doms[k].g), 1)}</b></td>`).join('')}
+      <td class="fin"><b>${r.fg ? fmt(r.fg.pct, 1) + '%' + (r.fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin"><b>${r.prop ?? '—'}</b></td>
+      <td class="tn"><select class="final" data-tn="${r.s.id}|final" aria-label="Nível final de ${esc(r.s.name)}"><option value="">${r.prop !== null ? 'Proposta: ' + r.prop : '—'}</option>${[1, 2, 3, 4, 5].map(v => `<option ${r.fin === v ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td class="stc">${stCell}</td>${evoCells}</tr>`;
+  }).join('');
+  return `<div class="phead"><div><h2>Grelha final de avaliação — 3.º ciclo · ${esc(T[t])}${last ? ' (final do ano)' : ''}</h2>
+      <p>Gerada automaticamente a partir dos momentos de avaliação. Resultado de cada domínio em % (0 a 100), percentagem global ponderada pelos pesos e proposta de nível (1 a 5) pelos limiares da turma. Valide a proposta ou ajuste o nível: cada alteração fica registada.${c.cumulative && t > 0 ? ' Avaliação contínua: inclui os momentos dos períodos anteriores.' : ''}</p></div>
+    <div class="btnrow"><button class="btn ${inst ? 'on' : ''}" data-ginst>${ic('grid')}${inst ? 'Esconder' : 'Mostrar'} instrumentos</button><button class="btn" data-validate-all ${n.prop ? '' : 'disabled'}>${ic('check')}Validar todas as propostas${n.prop ? ` (${n.prop})` : ''}</button><button class="btn" data-gx>${ic('excel')}Excel</button><button class="btn primary" data-gp>${ic('print')}PDF / Imprimir</button></div></div>
+    <div class="gsum"><span><b>${n.val}</b> validadas</span><span><b>${n.adj}</b> ajustadas</span><span><b>${n.prop}</b> por validar</span>${rows.some(r => r.stale) ? `<span class="stb eval">${rows.filter(r => r.stale).length} a rever (avaliações alteradas depois da decisão)</span>` : ''}<span class="hint">Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%</span></div>
+    ${gaps.length ? `<div class="alert soft">${ic('help')}<span><b>Assinalado:</b> ${gaps.map(esc).join('; ')}.</span></div>` : ''}
+    ${distributionHTML(c, t)}
+    ${students.length ? `<div class="tablewrap"><table class="grade pauta gfinal"><thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody></table></div>` : '<div class="empty sm"><p>Adicione alunos para ver a grelha.</p></div>'}
+    <p class="legend">* falta a nota de algum domínio (pesos redistribuídos pelos restantes). Na evolução, a cinzento: proposta ainda não decidida. ▲▼ subida/descida em relação ao período anterior. Passe o rato sobre «Ajustado» para ver o registo da alteração.</p>`;
+}
+function validateAllBasic(c, t) {
+  let n = 0;
+  for (const s of activeStudents(c)) {
+    const r = basicRow(c, s, t); if (r.st !== 'prop') continue;
+    c.termNotes ||= {}; c.termNotes[t] ||= {}; const row = (c.termNotes[t][s.id] ||= {});
+    row.final = r.prop; logFinal(row, null, r.prop, r.prop, 'validar'); n++;
+  }
+  if (n) changed(); render(); toast(`${n} proposta(s) validada(s). Pode ajustar qualquer nível na coluna «Nível final».`, 4500);
+}
+function validateOneBasic(c, t, sid) {
+  const s = c.students.find(x => x.id === sid); const p = proposalOf(c, s, t); if (p === null) return;
+  c.termNotes ||= {}; c.termNotes[t] ||= {}; const row = (c.termNotes[t][sid] ||= {}); const before = row.final;
+  row.final = p; logFinal(row, before, p, p, 'validar'); changed(); render();
+}
+function basicExportData(c, t) {
+  const T = terms(c); const moms = termMoments(c, t);
+  const cols = c.domains.map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
+  const rows = activeStudents(c).map(s => ({ ...basicRow(c, s, t), evo: basicEvolution(c, s) }));
+  return { T, moms, cols, rows };
+}
+async function excelGridBasic(c, t) {
+  const { T, moms, cols, rows } = basicExportData(c, t); const tch = APP.state.teacher;
+  const h1 = [{ v: 'N.º', s: 3 }, { v: 'Nome', s: 3 }], h2 = [{ v: '', s: 3 }, { v: '', s: 3 }]; const merges = [{ s: { r: 4, c: 0 }, e: { r: 5, c: 0 } }, { s: { r: 4, c: 1 }, e: { r: 5, c: 1 } }];
+  for (const { d, ms } of cols) { merges.push({ s: { r: 4, c: h1.length }, e: { r: 4, c: h1.length + ms.length } }); h1.push({ v: `${d.name} (${fmtMax(d.weight)}%)`, s: 3 }); for (let i = 0; i < ms.length; i++) h1.push({ v: '', s: 3 }); ms.forEach(m => h2.push({ v: shortName(m), s: 3 })); h2.push({ v: 'Domínio %', s: 3 }); }
+  const fc = h1.length; merges.push({ s: { r: 4, c: fc }, e: { r: 4, c: fc + 1 } }, { s: { r: 4, c: fc + 2 }, e: { r: 4, c: fc + 3 } }, { s: { r: 4, c: fc + 4 }, e: { r: 4, c: fc + 3 + T.length } });
+  h1.push({ v: 'Proposta', s: 12 }, { v: '', s: 12 }, { v: 'Decisão do professor', s: 12 }, { v: '', s: 12 }, { v: 'Evolução (nível)', s: 3 }, ...T.slice(1).map(() => ({ v: '', s: 3 })), { v: 'Registo de alterações', s: 3 });
+  h2.push({ v: 'Global %', s: 12 }, { v: 'Nível', s: 12 }, { v: 'Nível final', s: 12 }, { v: 'Estado', s: 12 }, ...T.map((x, i) => ({ v: `${i + 1}.º ${T.length === 2 ? 'sem.' : 'per.'}`, s: 3 })), { v: '', s: 3 });
+  merges.push({ s: { r: 4, c: h1.length - 1 }, e: { r: 5, c: h1.length - 1 } });
+  const data = [[{ v: `Grelha final de avaliação — 3.º ciclo — ${T[t]}${t === T.length - 1 ? ' (final do ano)' : ''}`, s: 1 }], [{ v: `${c.subject} · Turma ${c.name} · Ano letivo ${c.year}${tch.school ? ' · ' + tch.school : ''}${tch.name ? ' · Prof. ' + tch.name : ''}`, s: 2 }], [{ v: `Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%. Resultados em % (0 a 100).`, s: 11 }], [], h1, h2];
+  for (const r of rows) {
+    const line = [{ v: r.s.n || '', s: 4 }, { v: r.s.name, s: 5 }];
+    cols.forEach(({ d, ms }, k) => { ms.forEach(m => line.push(isAbsent(m, r.s.id) ? { v: 'F', s: 4 } : { v: n1(gShow(c, domainGrade(m, r.s.id, d.id))), s: 6 })); line.push({ v: n1(gShow(c, r.doms[k].g)), s: 14 }); });
+    line.push({ v: r.fg ? round(r.fg.pct, 1) : '', s: 13 }, { v: r.prop ?? '', s: 7 }, { v: r.fin ?? '', s: r.fin !== null ? 8 : 4 }, { v: r.st === 'val' ? 'Validado' : r.st === 'adj' ? `Ajustado (proposta ${r.prop})` : r.st === 'prop' ? 'Por validar' : '', s: r.st === 'val' ? 8 : r.st === 'adj' ? 10 : 4 });
+    r.evo.forEach(e => line.push(e ? { v: e.v, s: e.dec ? 4 : 15 } : { v: '', s: 4 })); line.push({ v: logText(r.nt.log).replace(/\n/g, ' | '), s: 16 });
+    data.push(line);
+  }
+  const d = termDistribution(c, t);
+  data.push([], [{ v: 'Legenda: ' + moms.map(m => `${shortName(m)} = ${m.name}${m.term !== t ? ' (' + T[m.term] + ')' : ''}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · '), s: 11 }]);
+  if (d.n) data.push([{ v: distributionLine(c, t), s: 11 }]);
+  data.push([{ v: 'Global = soma de (resultado do domínio × peso). Evolução a itálico: proposta ainda não decidida.', s: 11 }], [], [{ v: 'O(A) professor(a): ______________________________     Data: ____/____/______', s: 0 }]);
+  const widths = [5, 30, ...h2.slice(2, -1).map(() => 9), 40];
+  await saveStyled(`PAUTA_Grelha_final_${safeName(c.name)}_${safeName(T[t])}.xlsx`, [{ name: 'Grelha final', rows: data, widths, merges, freeze: { r: 6, c: 2 } }]);
+  toast('Excel da grelha final guardado nas Transferências.');
+}
+function printGridBasic(c, t) {
+  const { T, moms, cols, rows } = basicExportData(c, t); const st = padRows(rows, 0);
+  const ncols = sum(cols.map(x => x.ms.length + 1)) + 4 + T.length; const fs = ncols > 34 ? 6.5 : ncols > 26 ? 7 : ncols > 20 ? 7.5 : ncols > 14 ? 8 : 9;
+  const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 1}" class="dom">${esc(d.name)}<small>${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="2" class="fin">Proposta</th><th colspan="2" class="dec" style="width:auto">Decisão do professor</th><th colspan="${T.length}">Evolução</th>`;
+  const h2 = cols.map(({ ms }) => ms.map(m => `<th>${esc(shortName(m))}</th>`).join('') + '<th class="avg">%</th>').join('') + `<th class="fin">%</th><th class="fin">Nível</th><th class="dec" style="width:11mm">Nível final</th><th class="dec" style="width:18mm">Estado</th>${T.map((x, i) => `<th>${i + 1}.º</th>`).join('')}`;
+  const body = st.map(r => `<tr><td class="n">${r.s.n || ''}</td><td class="nm">${esc(r.s.name)}</td>${cols.map(({ d, ms }, k) => ms.map(m => `<td>${isAbsent(m, r.s.id) ? 'F' : isNum(domainGrade(m, r.s.id, d.id)) ? fmt(gShow(c, domainGrade(m, r.s.id, d.id)), 0) : ''}</td>`).join('') + `<td class="avg">${r.doms[k].g === null ? '' : fmt(gShow(c, r.doms[k].g), 1)}</td>`).join('')}
+    <td class="fin"><b>${r.fg ? fmt(r.fg.pct, 1) + (r.fg.missing.length ? '*' : '') : ''}</b></td><td class="fin"><b>${r.prop ?? ''}</b></td><td class="dec"><b>${r.fin ?? ''}</b></td><td class="dec" style="width:18mm;white-space:nowrap;font-weight:400;font-size:.72em">${r.stale ? 'Rever' : r.st === 'val' ? 'Validado' : r.st === 'adj' ? 'Ajustado' : r.st === 'prop' ? 'A validar' : ''}</td>${r.evo.map(e => `<td${e && !e.dec ? ' style="color:#8a9a95;font-style:italic"' : ''}>${e ? e.v : ''}</td>`).join('')}</tr>`).join('');
+  const legend = moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${m.term !== t ? ' (' + esc(T[m.term]) + ')' : ''}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ');
+  printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Grelha final de avaliação — 3.º ciclo', T[t] + (t === T.length - 1 ? ' (final do ano)' : '') + ' · Níveis 1 a 5')}
+    <table class="pt"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>
+    <footer class="pf"><span>${legend || 'Sem momentos de avaliação.'}<br>${distributionLine(c, t) ? '<b>' + esc(distributionLine(c, t)) + '.</b><br>' : ''}Resultados em % (0 a 100). Global = soma de (resultado do domínio × peso)${rows.some(r => r.fg?.missing.length) ? ' (* = falta a nota de algum domínio; pesos redistribuídos)' : ''} · Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%. Evolução a itálico: proposta ainda não decidida. F = faltou.</span>
+    <span class="sign">O(A) professor(a): ______________________________ &nbsp; Data: ____/____/______<br><small class="plic">${esc(licenseLine())}</small> ${pautaMark()}</span></footer></div>`, { landscape: true, title: 'Grelha final ' + c.name + ' ' + T[t] });
+  toast('Para PDF, escolha «Guardar como PDF» na janela de impressão.', 5000);
+}
+
+// ---------------------------------------------------------------- GRELHA FINAL — ENSINO PROFISSIONAL
+/** Turmas do ensino profissional com o mesmo nome (outras disciplinas da mesma turma, na PAUTA). */
+const sameProfClasses = c => APP.state.classes.filter(x => isProf(x) && normalize(x.name) === normalize(c.name) && normalize(x.year) === normalize(c.year));
+function gridProfHTML(c) {
+  const mods = c.modules || []; const students = activeStudents(c);
+  const gmode = view.gmode === 'global' ? 'global' : 'mod';
+  const seg = `<div class="seg sm" role="tablist"><button class="${gmode === 'mod' ? 'on' : ''}" data-gmode="mod">Por módulo/UFCD</button><button class="${gmode === 'global' ? 'on' : ''}" data-gmode="global">Grelha global da turma</button></div>`;
+  if (!mods.length) return `<div class="phead"><div><h2>Grelha final de avaliação — Ensino profissional</h2><p>Organizada por módulo/UFCD, com classificações de 0 a 20.</p></div></div>
+    <div class="empty sm">${ic('sliders', 'big')}<h3>Indique primeiro os módulos/UFCD da disciplina</h3><p>Em «Editar turma» acrescente os módulos ou UFCD e, ao criar cada momento de avaliação, escolha o módulo a que pertence.</p><button class="btn primary" data-tab="config">Indicar módulos/UFCD</button></div>`;
+  const tools = `<div class="btnrow">${seg}<button class="btn" data-gx>${ic('excel')}Excel</button><button class="btn primary" data-gp>${ic('print')}PDF / Imprimir</button></div>`;
+  const unassigned = hasUnassigned(c) ? `<div class="alert soft">${ic('help')}<span><b>Há momentos sem módulo atribuído</b> (${c.moments.filter(m => momentModule(c, m) === '_none').length}). Não entram em nenhuma classificação: abra-os em «Momentos de avaliação → Sem módulo» e escolha o módulo em «Editar momento».</span></div>` : '';
+  if (gmode === 'global') return `<div class="phead"><div><h2>Grelha global da turma ${esc(c.name)} — Ensino profissional</h2><p>Classificação de cada módulo/UFCD (0 a 20). A cheio: classificação validada pelo professor; a cinzento: proposta ainda em avaliação. ${sameProfClasses(c).length > 1 ? 'Inclui as outras disciplinas desta turma registadas na sua PAUTA.' : ''}</p></div>${tools}</div>${unassigned}${profGlobalTable(c)}`;
+  if (!mods.some(x => x.id === view.gmod)) view.gmod = mods.find(md => moduleMoments(c, md.id).length && students.some(s => modStatus(c, s, md.id).st === 'eval'))?.id || mods[0].id;
+  const mid = view.gmod; const md = mods.find(x => x.id === mid); const moms = moduleMoments(c, mid);
+  const cols = c.domains.filter(d => Number(d.weight) > 0 || moms.some(m => momentDomainIds(c, m).includes(d.id))).map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
+  const rows = students.map(s => ({ s, ...modStatus(c, s, mid, moms) }));
+  const cnt = k => rows.filter(r => r.st === k).length; const nprop = rows.filter(r => r.st === 'eval' && r.prop !== null && !r.g.pending).length;
+  const modSel = `<label class="f inline">Módulo / UFCD<select data-gmod>${mods.map(x => { const ms = moduleMoments(c, x.id).length; return `<option value="${x.id}" ${x.id === mid ? 'selected' : ''}>${esc(modName(x))}${x.hours ? ' · ' + esc(x.hours) + ' h' : ''}${ms ? '' : ' (sem avaliações)'}</option>`; }).join('')}</select></label>`;
+  const head1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 1}" class="dg">${esc(d.name)}<small>peso ${fmtMax(d.weight)}%</small></th>`).join('') + `<th colspan="2" class="dg fin">Classificação calculada</th><th colspan="2" class="dg fin2">Validação do professor</th>`;
+  const head2 = cols.map(({ ms }) => ms.map(m => `<th class="q" title="${esc(m.name)}">${esc(shortName(m))}</th>`).join('') + '<th class="dt">Média</th>').join('') + '<th class="fin">0–20</th><th class="fin">Proposta</th><th class="fin2">Classificação</th><th class="fin2">Estado</th>';
+  const body = rows.map(r => {
+    const dom = d => r.g?.doms.find(p => p.d.id === d.id)?.g ?? null;
+    const action = r.st === 'eval' ? (r.prop !== null ? `<button class="btn xs" data-mfok="${r.s.id}" ${r.g.pending ? 'title="Há avaliações por corrigir neste módulo"' : ''}>${ic('check')}Validar ${r.prop}</button>` : '') : '';
+    return `<tr><td class="n">${r.s.n || ''}</td><td class="nm"><button class="link" data-percurso="${r.s.id}" title="Ver o percurso de avaliação">${esc(r.s.name)}</button>${medBadge(r.s)}</td>${cols.map(({ d, ms }) => ms.map(m => { const x = domainGrade(m, r.s.id, d.id); return `<td>${isAbsent(m, r.s.id) ? '<span class="mut">F</span>' : fmt(x, 1)}</td>`; }).join('') + `<td class="dt"><b>${fmt(dom(d), 1)}</b></td>`).join('')}
+      <td class="fin"><b>${r.g ? fmt(r.g.v20, 2) + (r.g.missing.length ? '*' : '') : '—'}</b>${r.g?.pending ? '<small class="mut"> incompleto</small>' : ''}</td><td class="fin"><b>${r.prop ?? '—'}</b></td>
+      <td class="tn"><select class="final" data-mf="${r.s.id}" aria-label="Classificação de ${esc(r.s.name)} no módulo"><option value="">${r.prop !== null ? 'Proposta: ' + r.prop : '—'}</option>${Array.from({ length: 21 }, (_, i) => `<option ${r.v === i ? 'selected' : ''}>${i}</option>`).join('')}</select></td>
+      <td class="stc">${r.st === 'eval' ? stBadge('eval') + ' ' + action : stBadge(r.st, !r.stale && r.val?.log?.length && r.v !== r.prop ? ` · proposta ${r.prop ?? '—'}` : '')}${r.stale ? ` <span class="stb eval" title="Alguma avaliação deste módulo foi alterada depois da validação">Rever · proposta agora ${r.prop ?? '—'}</span>` : ''}${r.val?.log?.length ? `<span class="loginfo" title="${esc(logText(r.val.log))}">${ic('help')}</span>` : ''}</td></tr>`;
+  }).join('');
+  return `<div class="phead"><div><h2>Grelha final de avaliação — Ensino profissional</h2><p>Classificação de cada módulo/UFCD (0 a 20) calculada com os momentos desse módulo e os domínios e pesos da turma. O módulo fica <b>concluído</b> quando a classificação validada é igual ou superior a ${fmtMax(modMin(c))} valores. Clique no nome de um aluno para ver o percurso.</p></div>${tools}</div>
+    ${unassigned}
+    <div class="gbar">${modSel}<div class="gsum"><span><b>${cnt('ok')}</b> concluído(s)</span><span><b>${cnt('nok')}</b> não concluído(s)</span><span><b>${cnt('eval')}</b> em avaliação</span></div><button class="btn sm" data-validate-all ${nprop ? '' : 'disabled'}>${ic('check')}Validar todas as propostas${nprop ? ` (${nprop})` : ''}</button></div>
+    ${!moms.length ? `<div class="alert soft">${ic('test')}<span>Este módulo ainda não tem momentos de avaliação. Crie-os em «Momentos de avaliação», escolhendo o módulo ${esc(modName(md))}.</span><button class="btn sm" data-mod="${mid}" data-tab="momentos">Ir para os momentos</button></div>` : ''}
+    ${students.length ? `<div class="tablewrap"><table class="grade pauta gfinal"><thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody></table></div>` : '<div class="empty sm"><p>Adicione alunos para ver a grelha.</p></div>'}
+    <p class="legend">Notas de 0 a 20 por momento e domínio. ${moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${Number(m.weight) === 2 ? ' — conta a dobrar' : ''}`).join(' · ')}${rows.some(r => r.g?.missing.length) ? ' · * falta a nota de algum domínio (pesos redistribuídos).' : ''} «Validar» só valida a proposta calculada; pode escolher outra classificação — a alteração fica registada.</p>`;
+}
+function profGlobalData(c) {
+  const classes = sameProfClasses(c).sort((a, b) => (a.id === c.id ? -1 : b.id === c.id ? 1 : a.subject.localeCompare(b.subject, 'pt')));
+  // Alunos: os da turma atual; os das outras disciplinas juntam-se pelo nome.
+  const roster = activeStudents(c).map(s => ({ s, key: normalize(s.name) }));
+  const groups = classes.map(k => ({ k, mods: (k.modules || []).map(md => ({ md, moms: moduleMoments(k, md.id) })) }));
+  const rows = roster.map(({ s, key }) => {
+    const cells = groups.map(({ k, mods }) => { const ks = k.id === c.id ? s : activeStudents(k).find(x => normalize(x.name) === key); return mods.map(({ md, moms }) => ks ? modStatus(k, ks, md.id, moms) : null); });
+    const flat = cells.flat().filter(Boolean); return { s, cells, ok: flat.filter(x => x.st === 'ok').length, nok: flat.filter(x => x.st === 'nok').length, ev: flat.filter(x => x.st === 'eval' && moduleHasMoments(x)).length, total: groups.reduce((a, g) => a + g.mods.length, 0) };
+  });
+  return { groups, rows };
+}
+const moduleHasMoments = x => x.g !== null || x.val;
+function profGlobalTable(c) {
+  const { groups, rows } = profGlobalData(c);
+  const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>` + groups.map(({ k, mods }) => `<th colspan="${mods.length || 1}" class="dg">${esc(k.subject)}</th>`).join('') + '<th colspan="3" class="dg fin">Módulos/UFCD</th>';
+  const h2 = groups.map(({ mods }) => mods.length ? mods.map(({ md }) => `<th class="q" title="${esc(modName(md))}">${esc(modShort(md))}</th>`).join('') : '<th class="q">—</th>').join('') + '<th class="fin">Concluídos</th><th class="fin">Não concl.</th><th class="fin">Em aval.</th>';
+  const body = rows.map(r => `<tr><td class="n">${r.s.n || ''}</td><td class="nm"><button class="link" data-percurso="${r.s.id}">${esc(r.s.name)}</button></td>${r.cells.map(cs => cs.length ? cs.map(x => !x ? '<td><span class="mut">·</span></td>' : x.st === 'eval' ? `<td class="gcell eval">${x.prop !== null ? `<span class="mut">${x.prop}</span>` : '<span class="mut">—</span>'}</td>` : `<td class="gcell ${x.st}"><b>${x.v}</b></td>`).join('') : '<td></td>').join('')}
+    <td class="fin"><b>${r.ok}</b>/${r.total}</td><td class="fin">${r.nok || ''}</td><td class="fin">${r.ev || ''}</td></tr>`).join('');
+  return `<div class="tablewrap"><table class="grade pauta gfinal gglobal"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table></div>
+    <p class="legend"><span class="stb ok">verde</span> concluído · <span class="stb nok">vermelho</span> não concluído · <span class="mut">cinzento</span> proposta em avaliação · — sem avaliações · «·» aluno não encontrado nessa disciplina.</p>`;
+}
+function percurso(c, sid) {
+  const s = c.students.find(x => x.id === sid); if (!s) return;
+  const blocks = (c.modules || []).map(md => {
+    const moms = moduleMoments(c, md.id); const r = modStatus(c, s, md.id, moms);
+    const lines = moms.map(m => { const p = momentPercent(c, m, s.id); return `<tr><td>${esc(m.name)}${m.date ? ` <small class="mut">${new Date(m.date + 'T12:00').toLocaleDateString('pt-PT')}</small>` : ''}</td><td>${momentDomainIds(c, m).map(id => `${esc(c.domains.find(d => d.id === id)?.name)}: ${isAbsent(m, s.id) ? 'F' : fmt(domainGrade(m, s.id, id), 1)}`).join(' · ')}</td><td><b>${isAbsent(m, s.id) ? 'Faltou' : p === null ? '—' : fmt(p / 5, 1) + ' val.'}</b></td></tr>`; }).join('');
+    return `<div class="pcblock"><div class="pch"><b>${esc(modName(md))}</b>${md.hours ? `<small>${esc(md.hours)} h</small>` : ''}<span>${r.g ? 'Calculada ' + fmt(r.g.v20, 2) + ' · proposta ' + r.prop : 'Sem avaliações'}${r.v !== null ? ' · <b>validada ' + r.v + '</b>' : ''}</span>${r.g || r.val ? stBadge(r.st) : ''}</div>
+      ${lines ? `<table class="grade results"><tbody>${lines}</tbody></table>` : ''}${r.val?.log?.length ? `<p class="hint" style="white-space:pre-line">${esc(logText(r.val.log))}</p>` : ''}</div>`;
+  }).join('');
+  modal({ title: `Percurso de avaliação · ${esc(s.name)}`, wide: true, intro: `${esc(c.subject)} · Turma ${esc(c.name)} · ${esc(c.year)}. Classificações dos momentos em valores (0 a 20).`, body: blocks || '<p class="hint">Sem módulos.</p>',
+    actions: [{ label: 'Fechar' }, { label: `${ic('print')}Imprimir / PDF`, kind: 'primary', run: () => printPercurso(c, s) }] });
+}
+function printPercurso(c, s) {
+  const rows = (c.modules || []).map(md => { const moms = moduleMoments(c, md.id); const r = modStatus(c, s, md.id, moms); return `<tr><td class="nm">${esc(modName(md))}</td><td>${esc(md.hours ?? '')}</td><td style="text-align:left">${moms.map(m => esc(shortName(m)) + ' ' + (isAbsent(m, s.id) ? 'F' : fmt((momentPercent(c, m, s.id) ?? NaN) / 5, 1))).join(' · ')}</td><td>${r.g ? fmt(r.g.v20, 2) : ''}</td><td><b>${r.prop ?? ''}</b></td><td><b>${r.v ?? ''}</b></td><td>${r.g || r.val ? ST_LABEL[r.st] : ''}</td></tr>`; }).join('');
+  printDoc(`<div class="pdoc" style="--fs:9pt">${docHeader(c, 'Percurso de avaliação — ' + s.name, 'Ensino profissional · módulos/UFCD (0 a 20)')}
+    <table class="pt"><thead><tr><th class="nm">Módulo / UFCD</th><th>Horas</th><th>Momentos (valores)</th><th>Calculada</th><th>Proposta</th><th>Validada</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
+    <footer class="pf"><span>Módulo concluído com classificação validada ≥ ${fmtMax(modMin(c))} valores.${licenseLine() ? ' <b>' + esc(licenseLine()) + '.</b>' : ''}</span>${pautaMark()}</footer></div>`, { landscape: false, title: 'Percurso ' + s.name });
+}
+function setModFinal(c, mid, sid, v, how) {
+  c.modFinals ||= {}; c.modFinals[mid] ||= {}; const row = (c.modFinals[mid][sid] ||= {}); const before = row.v;
+  const s = c.students.find(x => x.id === sid); const r = modStatus(c, s, mid);
+  if (v === null) delete row.v; else row.v = v;
+  if (before !== row.v) { logFinal(row, before, row.v, r.prop, how); row.at = new Date().toISOString(); }
+  if (row.v === undefined && !row.log?.length) delete c.modFinals[mid][sid];
+}
+function validateAllProf(c) {
+  const mid = view.gmod; let n = 0; const moms = moduleMoments(c, mid);
+  for (const s of activeStudents(c)) { const r = modStatus(c, s, mid, moms); if (r.st === 'eval' && r.prop !== null && !r.g.pending) { setModFinal(c, mid, s.id, r.prop, 'validar'); n++; } }
+  if (n) changed(); render(); toast(`${n} classificação(ões) validada(s). Os alunos com avaliações por corrigir ficam em avaliação.`, 5000);
+}
+async function excelGridProf(c) {
+  const tch = APP.state.teacher; const mods = c.modules || []; const sheets = [];
+  const head = [[{ v: `Grelha final de avaliação — Ensino profissional — ${c.subject}`, s: 1 }], [{ v: `Turma ${c.name} · Ano letivo ${c.year}${tch.school ? ' · ' + tch.school : ''}${tch.name ? ' · Prof. ' + tch.name : ''}`, s: 2 }], [{ v: `Classificações de 0 a 20. Módulo concluído com classificação validada ≥ ${fmtMax(modMin(c))} valores.`, s: 11 }], []];
+  // folha global
+  { const { groups, rows } = profGlobalData(c); const h1 = [{ v: 'N.º', s: 3 }, { v: 'Nome', s: 3 }], h2 = [{ v: '', s: 3 }, { v: '', s: 3 }]; const merges = [{ s: { r: 4, c: 0 }, e: { r: 5, c: 0 } }, { s: { r: 4, c: 1 }, e: { r: 5, c: 1 } }];
+    for (const { k, mods: ms } of groups) { const n = Math.max(1, ms.length); merges.push({ s: { r: 4, c: h1.length }, e: { r: 4, c: h1.length + n - 1 } }); h1.push({ v: k.subject, s: 3 }); for (let i = 1; i < n; i++) h1.push({ v: '', s: 3 }); if (ms.length) ms.forEach(({ md }) => h2.push({ v: modShort(md), s: 3 })); else h2.push({ v: '—', s: 3 }); }
+    merges.push({ s: { r: 4, c: h1.length }, e: { r: 4, c: h1.length + 2 } }); h1.push({ v: 'Módulos/UFCD', s: 12 }, { v: '', s: 12 }, { v: '', s: 12 }); h2.push({ v: 'Concluídos', s: 12 }, { v: 'Não concluídos', s: 12 }, { v: 'Em avaliação', s: 12 });
+    const data = [...head, h1, h2];
+    for (const r of rows) data.push([{ v: r.s.n || '', s: 4 }, { v: r.s.name, s: 5 }, ...r.cells.flatMap(cs => cs.length ? cs.map(x => !x ? { v: '', s: 4 } : x.st === 'eval' ? { v: x.prop ?? '', s: 10 } : { v: x.v, s: x.st === 'ok' ? 8 : 9 }) : [{ v: '', s: 4 }]), { v: `${r.ok}/${r.total}`, s: 7 }, { v: r.nok || '', s: 4 }, { v: r.ev || '', s: 4 }]);
+    data.push([], [{ v: 'Verde: concluído · vermelho: não concluído · amarelo (itálico): proposta ainda em avaliação.', s: 11 }], ...groups.map(({ k, mods: ms }) => [{ v: `${k.subject}: ` + ms.map(({ md }) => `${modLegend(md)}${md.hours ? ' (' + md.hours + ' h)' : ''}`).join(' · '), s: 11 }]), [], [{ v: 'O(A) professor(a): ______________________________     Data: ____/____/______', s: 0 }]);
+    sheets.push({ name: 'Grelha global', rows: data, widths: [5, 30, ...h2.slice(2).map(() => 10)], merges, freeze: { r: 6, c: 2 } }); }
+  // uma folha por módulo
+  const used = new Set(['Grelha global']);
+  for (const md of mods) {
+    const moms = moduleMoments(c, md.id); const cols = c.domains.filter(d => moms.some(m => momentDomainIds(c, m).includes(d.id))).map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
+    const h1 = [{ v: 'N.º', s: 3 }, { v: 'Nome', s: 3 }], h2 = [{ v: '', s: 3 }, { v: '', s: 3 }]; const merges = [{ s: { r: 4, c: 0 }, e: { r: 5, c: 0 } }, { s: { r: 4, c: 1 }, e: { r: 5, c: 1 } }];
+    for (const { d, ms } of cols) { merges.push({ s: { r: 4, c: h1.length }, e: { r: 4, c: h1.length + ms.length } }); h1.push({ v: `${d.name} (${fmtMax(d.weight)}%)`, s: 3 }); ms.forEach(() => h1.push({ v: '', s: 3 })); ms.forEach(m => h2.push({ v: shortName(m), s: 3 })); h2.push({ v: 'Média', s: 3 }); }
+    merges.push({ s: { r: 4, c: h1.length }, e: { r: 4, c: h1.length + 3 } }); h1.push({ v: 'Classificação', s: 12 }, { v: '', s: 12 }, { v: '', s: 12 }, { v: '', s: 12 }, { v: 'Registo', s: 3 }); h2.push({ v: 'Calculada', s: 12 }, { v: 'Proposta', s: 12 }, { v: 'Validada', s: 12 }, { v: 'Estado', s: 12 }, { v: '', s: 3 });
+    const data = [[{ v: `${modName(md)}${md.hours ? ' · ' + md.hours + ' h' : ''}`, s: 1 }], [{ v: `${c.subject} · Turma ${c.name} · Ano letivo ${c.year}`, s: 2 }], [{ v: moms.map(m => `${shortName(m)} = ${m.name}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ') || 'Sem momentos de avaliação.', s: 11 }], [], h1, h2];
+    for (const s of activeStudents(c)) { const r = modStatus(c, s, md.id, moms); const line = [{ v: s.n || '', s: 4 }, { v: s.name, s: 5 }];
+      for (const { d, ms } of cols) { ms.forEach(m => line.push(isAbsent(m, s.id) ? { v: 'F', s: 4 } : { v: n1(domainGrade(m, s.id, d.id)), s: 6 })); line.push({ v: n1(r.g?.doms.find(p => p.d.id === d.id)?.g ?? null), s: 14 }); }
+      line.push({ v: r.g ? round(r.g.v20, 2) : '', s: 13 }, { v: r.prop ?? '', s: 7 }, { v: r.v ?? '', s: r.st === 'ok' ? 8 : r.st === 'nok' ? 9 : 4 }, { v: r.g || r.val ? ST_LABEL[r.st] : '', s: r.st === 'ok' ? 8 : r.st === 'nok' ? 9 : 10 }, { v: logText(r.val?.log).replace(/\n/g, ' | '), s: 16 }); data.push(line); }
+    let nm = (modShort(md) || 'Módulo').replace(/[\\/?*[\]:]/g, ' ').slice(0, 28); while (used.has(nm)) nm = nm.slice(0, 26) + '_' + used.size; used.add(nm);
+    sheets.push({ name: nm, rows: data, widths: [5, 30, ...h2.slice(2, -1).map(() => 10), 40], merges, freeze: { r: 6, c: 2 } });
+  }
+  await saveStyled(`PAUTA_Grelha_final_${safeName(c.name)}_${safeName(c.subject)}_profissional.xlsx`, sheets);
+  toast('Excel guardado nas Transferências (grelha global e uma folha por módulo/UFCD).', 5000);
+}
+function printGridProf(c) {
+  if (view.gmode === 'global') {
+    const { groups, rows } = profGlobalData(c); const ncols = sum(groups.map(g => Math.max(1, g.mods.length))) + 3; const fs = ncols > 30 ? 6.5 : ncols > 22 ? 7.5 : ncols > 14 ? 8.5 : 9.5;
+    const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>` + groups.map(({ k, mods }) => `<th colspan="${mods.length || 1}" class="dom">${esc(k.subject)}</th>`).join('') + '<th colspan="3" class="fin">Módulos/UFCD</th>';
+    const h2 = groups.map(({ mods }) => mods.length ? mods.map(({ md }) => `<th>${esc(modShort(md))}</th>`).join('') : '<th>—</th>').join('') + '<th class="fin">Concl.</th><th class="fin">Não concl.</th><th class="fin">Em aval.</th>';
+    const sty = { ok: 'background:#e1efe8;font-weight:700', nok: 'background:#fde2e1;font-weight:700', eval: 'color:#8a9a95;font-style:italic' };
+    const body = rows.map(r => `<tr><td class="n">${r.s.n || ''}</td><td class="nm">${esc(r.s.name)}</td>${r.cells.map(cs => cs.length ? cs.map(x => !x ? '<td></td>' : `<td style="${sty[x.st]}">${x.st === 'eval' ? (x.prop ?? '') : x.v}</td>`).join('') : '<td></td>').join('')}<td class="fin"><b>${r.ok}</b>/${r.total}</td><td class="fin">${r.nok || ''}</td><td class="fin">${r.ev || ''}</td></tr>`).join('');
+    const legend = groups.map(({ k, mods }) => `<b>${esc(k.subject)}</b>: ${mods.map(({ md }) => esc(modLegend(md))).join(' · ')}`).join('<br>');
+    printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Grelha final de avaliação — Ensino profissional', 'Grelha global da turma · módulos/UFCD (0 a 20)')}
+      <table class="pt"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>
+      <footer class="pf"><span>${legend}<br>Verde: concluído (≥ ${fmtMax(modMin(c))}) · vermelho: não concluído · cinzento/itálico: proposta ainda em avaliação.</span>
+      <span class="sign">O(A) professor(a): ______________________________ &nbsp; Data: ____/____/______<br><small class="plic">${esc(licenseLine())}</small> ${pautaMark()}</span></footer></div>`, { landscape: true, title: 'Grelha global ' + c.name });
+  } else {
+    const mid = view.gmod; const md = (c.modules || []).find(x => x.id === mid); if (!md) return; const moms = moduleMoments(c, mid);
+    const cols = c.domains.filter(d => moms.some(m => momentDomainIds(c, m).includes(d.id))).map(d => ({ d, ms: moms.filter(m => momentDomainIds(c, m).includes(d.id)) }));
+    const st = padRows(activeStudents(c), 0); const ncols = sum(cols.map(x => x.ms.length + 1)) + 4; const fs = ncols > 26 ? 7 : ncols > 18 ? 8 : 9;
+    const h1 = `<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>` + cols.map(({ d, ms }) => `<th colspan="${ms.length + 1}" class="dom">${esc(d.name)}<small>${fmtMax(d.weight)}%</small></th>`).join('') + '<th colspan="2" class="fin">Calculada</th><th colspan="2" class="dec" style="width:auto">Validação</th>';
+    const h2 = cols.map(({ ms }) => ms.map(m => `<th>${esc(shortName(m))}</th>`).join('') + '<th class="avg">Média</th>').join('') + '<th class="fin">0–20</th><th class="fin">Proposta</th><th class="dec" style="width:auto">Classif.</th><th class="dec" style="width:auto">Estado</th>';
+    const body = st.map(s => { const r = modStatus(c, s, mid, moms); return `<tr><td class="n">${s.n || ''}</td><td class="nm">${esc(s.name)}</td>${cols.map(({ d, ms }) => ms.map(m => `<td>${isAbsent(m, s.id) ? 'F' : isNum(domainGrade(m, s.id, d.id)) ? fmt(domainGrade(m, s.id, d.id), 1) : ''}</td>`).join('') + `<td class="avg">${fmt(r.g?.doms.find(p => p.d.id === d.id)?.g ?? null, 1).replace('—', '')}</td>`).join('')}<td class="fin">${r.g ? fmt(r.g.v20, 2) : ''}</td><td class="fin"><b>${r.prop ?? ''}</b></td><td class="dec"><b>${r.v ?? ''}</b></td><td class="dec" style="width:auto;white-space:nowrap;font-weight:400;font-size:.85em">${r.g || r.val ? ST_LABEL[r.st] : ''}</td></tr>`; }).join('');
+    printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Grelha final — ' + modName(md), 'Ensino profissional · classificação de 0 a 20' + (md.hours ? ' · ' + md.hours + ' h' : ''))}
+      <table class="pt"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>
+      <footer class="pf"><span>${moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ') || 'Sem momentos de avaliação.'}<br>Classificação = soma de (média do domínio × peso), só com os momentos deste módulo/UFCD. Concluído: classificação validada ≥ ${fmtMax(modMin(c))} valores. F = faltou.</span>
+      <span class="sign">O(A) professor(a): ______________________________ &nbsp; Data: ____/____/______<br><small class="plic">${esc(licenseLine())}</small> ${pautaMark()}</span></footer></div>`, { landscape: ncols > 8, title: 'Grelha ' + c.name + ' ' + modShort(md) });
+  }
+  toast('Para PDF, escolha «Guardar como PDF» na janela de impressão.', 5000);
+}
+function pasteModulesDialog(c) {
+  modal({ title: 'Colar lista de módulos/UFCD', intro: 'Um por linha: código e designação (ex.: «UFCD 6655 Comunicação interpessoal» ou «Módulo 3 – Textos de caráter autobiográfico»). Opcional: horas no fim (ex.: «25 h»).',
+    body: '<textarea id="modText" rows="10" placeholder="UFCD 6655 Comunicação interpessoal 25 h&#10;Módulo 1 – Textos de caráter autobiográfico"></textarea>',
+    actions: [{ label: 'Cancelar' }, { label: 'Acrescentar', kind: 'primary', run: () => {
+      const lines = $('#modText').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean); if (!lines.length) return mErr('Cole pelo menos uma linha.');
+      c.modules ||= []; let n = 0;
+      for (let l of lines) {
+        let hours = ''; const h = /\s*[-–—(]?\s*(\d{1,3})\s*h(oras)?\)?\s*$/i.exec(l); if (h) { hours = h[1]; l = l.slice(0, h.index).trim(); }
+        const m = /^((?:UFCD|M[óo]dulo|M)\s*[\w.]+)\s*[-–—:.]?\s*(.*)$/i.exec(l);
+        const code = m ? m[1].trim() : ''; const name = (m ? m[2] : l).trim();
+        if (c.modules.some(x => normalize(modName(x)) === normalize(modName({ code, name })))) continue;
+        c.modules.push({ id: uid(), code, name, hours }); n++;
+      }
+      changed(); render(); toast(`${n} módulo(s)/UFCD acrescentado(s).`);
+    } }] });
+}
+
+// ---------------------------------------------------------------- Excel com formatação (cores, bordas, cabeçalhos), sem bibliotecas novas
+const XML_ESC = v => String(v).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+const colName = i => { let s = ''; i++; while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; };
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="0.0"/><numFmt numFmtId="165" formatCode="0.00"/></numFmts>
+<fonts count="7"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF0B4D3E"/><name val="Calibri"/></font><font><i/><sz val="9"/><color rgb="FF5D6F68"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF0B4D3E"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF8A9A95"/><name val="Calibri"/></font></fonts>
+<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0B4D3E"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF1E6"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE1EFE8"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFDE2E1"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF6D9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8590C"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC9D4CF"/></left><right style="thin"><color rgb="FFC9D4CF"/></right><top style="thin"><color rgb="FFC9D4CF"/></top><bottom style="thin"><color rgb="FFC9D4CF"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="17">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="4" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="6" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="4" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="1" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="5" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="6" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+function sheetXML({ rows, widths = [], merges = [], freeze }) {
+  const cols = widths.length ? `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` : '';
+  const pane = freeze ? `<pane xSplit="${freeze.c}" ySplit="${freeze.r}" topLeftCell="${colName(freeze.c)}${freeze.r + 1}" activePane="bottomRight" state="frozen"/>` : '';
+  const body = rows.map((row, r) => `<row r="${r + 1}"${r === 0 ? ' ht="22" customHeight="1"' : ''}>${(row || []).map((cell, ci) => {
+    const o = cell !== null && typeof cell === 'object' ? cell : { v: cell }; const ref = colName(ci) + (r + 1); const s = o.s ? ` s="${o.s}"` : '';
+    if (o.v === '' || o.v === null || o.v === undefined) return o.s ? `<c r="${ref}"${s}/>` : '';
+    if (typeof o.v === 'number' && Number.isFinite(o.v)) return `<c r="${ref}"${s}><v>${o.v}</v></c>`;
+    return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${XML_ESC(o.v)}</t></is></c>`;
+  }).join('')}</row>`).join('');
+  const mg = merges.length ? `<mergeCells count="${merges.length}">${merges.map(m => `<mergeCell ref="${colName(m.s.c)}${m.s.r + 1}:${colName(m.e.c)}${m.e.r + 1}"/>`).join('')}</mergeCells>` : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${body}</sheetData>${mg}<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+}
+function buildStyledXlsx(X, sheets) {
+  const CFB = X.CFB; const zip = CFB.utils.cfb_new({ root: 'R' }); const enc = new TextEncoder();
+  const add = (p, txt) => CFB.utils.cfb_add(zip, p, enc.encode(txt));
+  add('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
+  add('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  add('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s, i) => `<sheet name="${XML_ESC(String(s.name).slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
+  add('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  add('xl/styles.xml', XLSX_STYLES);
+  sheets.forEach((s, i) => add(`xl/worksheets/sheet${i + 1}.xml`, sheetXML(s)));
+  return CFB.write(zip, { fileType: 'zip', type: 'array', compression: true });
+}
+async function saveStyled(file, sheets) {
+  const X = await loadXLSX(); const out = buildStyledXlsx(X, sheets);
+  download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), file);
+}
+
+// ---------------------------------------------------------------- eventos das grelhas e dos módulos
+document.addEventListener('click', async e => {
+  const t = e.target; const c = cur(); if (!c || !APP.state) return;
+  let el;
+  if ((el = t.closest('[data-mod]'))) { view.mod = el.dataset.mod; return render(); }
+  if ((el = t.closest('[data-gmode]'))) { view.gmode = el.dataset.gmode; return render(); }
+  if (t.closest('[data-ginst]')) { view.gInst = !view.gInst; return render(); }
+  if (t.closest('[data-validate-all]')) return isProf(c) ? validateAllProf(c) : validateAllBasic(c, view.term);
+  if ((el = t.closest('[data-tnok]'))) return validateOneBasic(c, view.term, el.dataset.tnok);
+  if ((el = t.closest('[data-mfok]'))) { const s = c.students.find(x => x.id === el.dataset.mfok); const r = modStatus(c, s, view.gmod); if (r.prop === null) return; if (r.g.pending && !(await confirmBox('Há avaliações por corrigir', `${esc(s.name)} ainda tem avaliações deste módulo por corrigir. Validar mesmo assim a proposta (${r.prop})?`, 'Validar'))) return; setModFinal(c, view.gmod, s.id, r.prop, 'validar'); changed(); return render(); }
+  if ((el = t.closest('[data-percurso]'))) return percurso(c, el.dataset.percurso);
+  if (t.closest('[data-gx]')) return (isProf(c) ? excelGridProf(c) : excelGridBasic(c, view.term)).catch(err => toast('Não foi possível criar o Excel: ' + err.message));
+  if (t.closest('[data-gp]')) return isProf(c) ? printGridProf(c) : printGridBasic(c, view.term);
+  if (t.closest('[data-add-module]')) { c.modules ||= []; c.modules.push({ id: uid(), code: '', name: '', hours: '' }); changed(); render(); setTimeout(() => $$('[data-mcode]').at(-1)?.focus(), 30); return; }
+  if (t.closest('[data-paste-modules]')) return pasteModulesDialog(c);
+  if ((el = t.closest('[data-mmove]'))) { const [id, d] = el.dataset.mmove.split('|'); const i = c.modules.findIndex(x => x.id === id); const j = i + Number(d); if (j < 0 || j >= c.modules.length) return; [c.modules[i], c.modules[j]] = [c.modules[j], c.modules[i]]; changed(); return render(); }
+  if ((el = t.closest('[data-del-module]'))) { const md = c.modules.find(x => x.id === el.dataset.delModule); if (c.moments.some(m => m.moduleId === md.id)) return toast('Este módulo tem momentos de avaliação. Mude-os de módulo (ou apague-os) primeiro.', 4500); if (c.modFinals?.[md.id] && Object.keys(c.modFinals[md.id]).length && !(await confirmBox('Apagar ' + esc(modName(md)) + '?', 'Este módulo tem classificações validadas, que também são apagadas.', 'Apagar', true))) return; c.modules = c.modules.filter(x => x !== md); if (c.modFinals) delete c.modFinals[md.id]; changed(); return render(); }
+});
+document.addEventListener('input', e => {
+  const t = e.target; const c = cur(); if (!c) return;
+  const md = id => (c.modules || []).find(x => x.id === id);
+  if (t.dataset.mcode) { md(t.dataset.mcode).code = t.value; changed(); return; }
+  if (t.dataset.mname) { md(t.dataset.mname).name = t.value; changed(); return; }
+  if (t.dataset.mhours) { md(t.dataset.mhours).hours = t.value.trim(); changed(); return; }
+});
+document.addEventListener('change', e => {
+  const t = e.target; const c = cur(); if (!c) return;
+  if (t.dataset.gmod !== undefined && t.tagName === 'SELECT') { view.gmod = t.value; return render(); }
+  if (t.dataset.mf) { const v = t.value === '' ? null : Number(t.value); const r = modStatus(c, c.students.find(x => x.id === t.dataset.mf), view.gmod); setModFinal(c, view.gmod, t.dataset.mf, v, v !== null && v === r.prop ? 'validar' : 'ajuste'); changed(); return render(); }
+  if (t.dataset.modmin !== undefined) { const v = parseNum(t.value); if (!Number.isFinite(v) || v < 0 || v > 20) { t.value = modMin(c); return toast('Escreva um valor entre 0 e 20.'); } c.modMin = v; changed(); return; }
+});
 
 boot();
 
