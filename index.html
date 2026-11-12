@@ -383,6 +383,8 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .gigroups{display:flex;flex-direction:column;gap:5px;margin:8px 0 2px 26px}
 .gigroup{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}.gigroup select{height:32px;border:1px solid #cfdad5;border-radius:8px;padding:0 6px;max-width:260px}
 .gigroup.off span{color:var(--graph);text-decoration:line-through}.gigroup i{color:var(--pen2)}
+.sidever{position:sticky;bottom:0;display:block;width:100%;margin-top:-34px;padding:9px 12px;border:0;border-top:1px solid #ffffff22;background:var(--ink);color:#b9d3c9;font:600 12px var(--sans);text-align:left;cursor:pointer}.sidever:hover{color:#fff}
+.side nav{padding-bottom:48px}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -445,7 +447,11 @@ const isProf = c => c?.level === 'profissional';
 const ptsScale = c => isBasic(c) ? 100 : 200;
 const LEVEL_LABEL = { basico: '3.º ciclo (níveis 1 a 5)', secundario: 'Secundário (0 a 20 valores)', profissional: 'Ensino profissional (módulos/UFCD, 0 a 20)' };
 const LEVEL_TAG = { basico: '3.º ciclo · níveis 1–5', secundario: 'Secundário · 0–20', profissional: 'Profissional · módulos 0–20' };
-const levelOptions = sel => [['basico', '3.º ciclo — níveis 1 a 5'], ['secundario', 'Secundário — 0 a 20 valores'], ['profissional', 'Profissional — módulos/UFCD']]
+// O 2.º ciclo funciona como o 3.º ciclo (níveis 1–5, cotações até 100); só muda o nome (c.ciclo = '2').
+const cic = c => c && c.ciclo === '2' ? '2.º ciclo' : '3.º ciclo';
+const levelKey = c => c.level === 'basico' && c.ciclo === '2' ? 'basico2' : c.level;
+const levelTag = c => c.level === 'basico' ? `${cic(c)} · níveis 1–5` : (LEVEL_TAG[c.level] || LEVEL_TAG.secundario);
+const levelOptions = sel => [['basico2', '2.º ciclo — níveis 1 a 5'], ['basico', '3.º ciclo — níveis 1 a 5'], ['secundario', 'Secundário — 0 a 20 valores'], ['profissional', 'Profissional — módulos/UFCD']]
   .map(([v, l]) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${l}</option>`).join('');
 /** Nota interna (0–20) apresentada na escala do nível: 3.º ciclo em % (= pontos em 100); restantes em valores. */
 const gShow = (c, g) => g === null || g === undefined ? null : isBasic(c) ? g * 5 : g;
@@ -888,7 +894,7 @@ function shell() {
     </div>
   </header>
   <div class="demobar" id="demobar" hidden>${ic('spark')}<span><b>Está a experimentar com uma turma fictícia.</b> Nada do que fizer aqui é guardado.</span><button class="btn primary sm" data-start-real>Começar a sério</button></div>
-  <aside class="side"><nav id="sideNav"></nav></aside>
+  <aside class="side"><nav id="sideNav"></nav><button type="button" class="sidever" data-versao title="Ver as novidades desta versão">PAUTA · versão ${PAUTA_VERSAO}</button></aside>
   <main id="main"></main>`;
 }
 function refreshSaveStatus() {
@@ -951,7 +957,7 @@ function homeHTML() {
   return `<section class="hero"><div><h1>Olá${name}.</h1><p>Escolha uma turma para corrigir testes, lançar notas ou imprimir a pauta.</p></div><button class="btn primary lg" data-new-class>${ic('plus')}Nova turma</button></section>
   <div class="cards">${cls.map(c => {
     const n = activeStudents(c).length; const moms = c.moments.length;
-    return `<button class="ccard" data-open-class="${c.id}"><span class="ctag">${esc(LEVEL_TAG[c.level] || LEVEL_TAG.secundario)}</span><b>${esc(c.name)}</b><span class="csub">${esc(c.subject)} · ${esc(c.year)}</span>
+    return `<button class="ccard" data-open-class="${c.id}"><span class="ctag">${esc(levelTag(c))}</span><b>${esc(c.name)}</b><span class="csub">${esc(c.subject)} · ${esc(c.year)}</span>
       <span class="cmeta"><span>${ic('users')}${n} aluno${n === 1 ? '' : 's'}</span><span>${ic('test')}${moms} momento${moms === 1 ? '' : 's'}</span></span></button>`;
   }).join('')}</div>`;
 }
@@ -964,7 +970,7 @@ function classHTML() {
   const c = cur(); if (view.term >= terms(c).length) view.term = 0;
   const prof = isProf(c);
   const tabs = [['momentos', 'Momentos de avaliação', 'test'], ...(prof ? [] : [['pauta', 'Pauta do período', 'grid']]),
-    ...(prof ? [['grelha', 'Grelha final · Profissional', 'excel']] : isBasic(c) ? [['grelha', 'Grelha final · 3.º ciclo', 'excel']] : []),
+    ...(prof ? [['grelha', 'Grelha final · Profissional', 'excel']] : isBasic(c) ? [['grelha', 'Grelha final · ' + cic(c), 'excel']] : []),
     ['sinteses', 'Sínteses', 'text'], ['balanco', 'Balanço', 'chart'],
     ['alunos', 'Alunos', 'users'], ['config', 'Editar turma', 'pen']];
   if ((view.tab === 'pauta' && prof) || (view.tab === 'grelha' && !prof && !isBasic(c))) view.tab = 'momentos';
@@ -1079,7 +1085,7 @@ function momentForm(c, existing = null) {
           ${writingOK(d) ? `<label class="rubchk"><input type="checkbox" data-qr="${q.id}" ${q.rubric ? 'checked' : ''}>Texto corrigido com a rubrica de exame</label>` : ''}
           <button type="button" class="btn xs icon" data-delq="${q.id}" aria-label="Apagar pergunta">${ic('x')}</button></div>`).join('')}
         </div>`;
-    }).join('') + `<p class="hint">Use «+ Pergunta» para acrescentar perguntas e «Dividir ${S}» para repartir a cotação igualmente. ${isBasic(c) ? '3.º ciclo: cada domínio tem no máximo 100 pontos; o resultado é a percentagem obtida.' : 'Cada domínio tem no máximo 200 pontos (20 valores).'} Se cotar o domínio com menos pontos, a PAUTA calcula a percentagem sobre a cotação que definiu.</p>`;
+    }).join('') + `<p class="hint">Use «+ Pergunta» para acrescentar perguntas e «Dividir ${S}» para repartir a cotação igualmente. ${isBasic(c) ? cic(c) + ': cada domínio tem no máximo 100 pontos; o resultado é a percentagem obtida.' : 'Cada domínio tem no máximo 200 pontos (20 valores).'} Se cotar o domínio com menos pontos, a PAUTA calcula a percentagem sobre a cotação que definiu.</p>`;
   };
   const body = `<div class="fgrid">
       <label class="f wide">Nome<input id="fName" value="${esc(m.name)}" placeholder="Ex.: Teste 1, Trabalho de grupo, Atitudes"></label>
@@ -1404,7 +1410,7 @@ function configHTML(c) {
     <label class="f">Nome<input data-cfg="name" value="${esc(c.name)}"></label>
     <label class="f">Disciplina<input data-cfg="subject" value="${esc(c.subject)}"></label>
     <label class="f">Ano letivo<input data-cfg="year" value="${esc(c.year)}"></label>
-    <label class="f">Nível de ensino<select data-cfg="level">${levelOptions(c.level)}</select></label>
+    <label class="f">Nível de ensino<select data-cfg="level">${levelOptions(levelKey(c))}</select></label>
     <label class="f" ${isProf(c) ? 'hidden' : ''}>Organização<select data-cfg="regime"><option value="periodos">3 períodos</option><option value="semestres" ${c.regime === 'semestres' ? 'selected' : ''}>2 semestres</option></select></label>
     <label class="f check" ${isProf(c) ? 'hidden' : ''}><input type="checkbox" data-cfg="cumulative" ${c.cumulative ? 'checked' : ''}><span>Avaliação contínua<small>A pauta do 2.º período inclui também os momentos do 1.º, etc.</small></span></label>
   </div></section>
@@ -1418,7 +1424,7 @@ function configHTML(c) {
     <label class="f">Mínimo de palavras<input data-wlim="0" value="${lim[0]}" inputmode="numeric"></label><label class="f">Máximo de palavras<input data-wlim="1" value="${lim[1]}" inputmode="numeric"></label></div>
     <p class="hint">${R.id === 'exame639' ? 'Correção linguística pela tabela oficial de erros tipo A (pontuação, ortografia, morfologia, citação) e tipo B (sintaxe, impropriedade lexical). Fora dos limites: −1 por palavra (máx. −5); menos de 80 palavras: 0.' : 'Ortografia: 0–4 erros → 4 · 5–10 → 3 · 11–16 → 1. Extensão: até 24 palavras fora dos limites −1; mais −2; menos de 55 palavras: 0.'} Se A ou B tiver 0, todos os parâmetros ficam a 0.</p></section>` : ''}
   ${isProf(c) ? modulesCfgHTML(c) : ''}
-  ${c.level === 'basico' ? `<section><h2>Níveis (3.º ciclo)</h2><p class="hint">Percentagem mínima para cada nível, de acordo com os critérios da escola.</p><div class="levels-cfg">${[2, 3, 4, 5].map((lv, i) => `<label class="f">Nível ${lv} a partir de<span class="wbox"><input data-cut="${i}" value="${c.levelCuts[i]}" inputmode="numeric"><span>%</span></span></label>`).join('')}</div></section>` : ''}
+  ${c.level === 'basico' ? `<section><h2>Níveis (${cic(c)})</h2><p class="hint">Percentagem mínima para cada nível, de acordo com os critérios da escola.</p><div class="levels-cfg">${[2, 3, 4, 5].map((lv, i) => `<label class="f">Nível ${lv} a partir de<span class="wbox"><input data-cut="${i}" value="${c.levelCuts[i]}" inputmode="numeric"><span>%</span></span></label>`).join('')}</div></section>` : ''}
   <section><h2>Nova turma igual a esta</h2><p class="hint">Cria outra turma com os mesmos domínios, pesos e critérios (e, se quiser, os mesmos testes ou alunos). Útil para outra turma do mesmo ano ou para o ano letivo seguinte.</p><button class="btn" data-new-class-from="${c.id}">${ic('copy')}Criar turma a partir desta</button></section>
   <section class="danger-zone"><h2>Apagar turma</h2><p class="hint">Apaga a turma, os alunos e todas as notas. Guarde antes uma cópia de segurança.</p><button class="btn danger" data-del-class>${ic('trash')}Apagar esta turma</button></section></div>`;
 }
@@ -1439,10 +1445,10 @@ function settingsHTML() {
     <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-rec>${ic('lock')}Criar chave de recuperação</button><button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
 }
 function helpHTML() {
-  return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página.</p></div></section>
+  return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página. Está a usar a <b>PAUTA versão ${PAUTA_VERSAO}</b> · <button type="button" class="link" data-versao>ver as novidades</button></p></div></section>
   <section class="panel help">
   <ol class="steps">
-    <li><b>Crie a turma</b> e escolha o nível: 3.º ciclo (níveis 1–5, cotações de 0 a 100 pontos), secundário (0–20, cotações de 0 a 200) ou ensino profissional (módulos/UFCD de 0 a 20, cotações de 0 a 200). Os domínios e pesos vêm preenchidos; ajuste-os em «Editar turma» (têm de somar 100%).</li>
+    <li><b>Crie a turma</b> e escolha o nível: 2.º ou 3.º ciclo (níveis 1–5, cotações de 0 a 100 pontos), secundário (0–20, cotações de 0 a 200) ou ensino profissional (módulos/UFCD de 0 a 20, cotações de 0 a 200). Os domínios e pesos vêm preenchidos; ajuste-os em «Editar turma» (têm de somar 100%).</li>
     <li><b>Adicione os alunos</b>: cole a lista ou importe Word, Excel ou PDF.</li>
     <li><b>Crie um momento de avaliação</b> (teste, trabalho, atitudes…) e escolha como vai corrigir:
       <ul><li><b>Pergunta a pergunta</b>: define as cotações de cada domínio (até 100 pontos no 3.º ciclo; até 200 no secundário e no profissional) e introduz os pontos de cada aluno.</li>
@@ -1986,7 +1992,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.0';
+const PAUTA_VERSAO = '3.2.3';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2133,6 +2139,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Agora também para o 2.º ciclo: ao criar a turma (ou em «Editar turma»), escolha «2.º ciclo — níveis 1 a 5». Funciona como o 3.º ciclo e os títulos das grelhas dizem «2.º ciclo».',
   'Novo separador «Sínteses»: síntese descritiva de cada aluno com frases pré-feitas (aproveitamento, evolução, domínios, empenho, comportamento, métodos de trabalho, assiduidade e recomendações). A PAUTA sugere frases a partir das notas e o texto pode ser corrigido à mão, copiado para o Inovar, impresso ou exportado para Excel.',
   'Medidas universais (DL 54/2018) nas sínteses: diferenciação pedagógica, acomodações curriculares, enriquecimento curricular, promoção do comportamento pró-social e intervenção em pequenos grupos, cada uma com as estratégias que usou. Pode aplicar as mesmas medidas a vários alunos de uma vez.',
   'Novo separador «Balanço da turma» por período, com os números da pauta (positivas, média, domínios mais fortes e mais fracos, evolução) e texto pré-feito.',
@@ -2230,12 +2237,12 @@ function newClassDialog(fromId = '') {
       <p class="hint" id="ncHint">${fromId ? '' : NC_IMPORT_HINT}</p>`,
     onOpen: () => {
       if (askTeacher) setTimeout(() => $('#ncTeacher')?.focus(), 40);
-      const last = cls.at(-1); if (last) { $('#ncSubject').value = last.subject; $('#ncLevel').value = last.level; $('#ncRegime').value = last.regime; } else { $('#ncLevel').value = 'basico'; }
-      $('#ncName').addEventListener('input', e => { if ($('#ncLevel').value === 'profissional') return; if (/1[012]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'secundario'; else if (/[789]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'basico'; });
+      const last = cls.at(-1); if (last) { $('#ncSubject').value = last.subject; $('#ncLevel').value = levelKey(last); $('#ncRegime').value = last.regime; } else { $('#ncLevel').value = 'basico'; }
+      $('#ncName').addEventListener('input', e => { if ($('#ncLevel').value === 'profissional') return; if (/1[012]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'secundario'; else if (/[789]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'basico'; else if (/[56]\.?º?/.test(e.target.value)) $('#ncLevel').value = 'basico2'; });
       const fromChange = () => {
         const src = cls.find(c => c.id === $('#ncFrom')?.value); $('#ncCopyOpts') && ($('#ncCopyOpts').hidden = !src);
         if ($('#ncFrom')?.value === '__import') { $('#ncHint').textContent = NC_IMPORT_HINT; return; }
-        if (src) { $('#ncSubject').value = src.subject; $('#ncLevel').value = src.level; $('#ncRegime').value = src.regime; $('#ncHint').textContent = `Fica com os mesmos domínios, pesos, limiares dos níveis e critérios da escrita da turma ${src.name}. Pode alterá-los depois em «Editar turma».`; }
+        if (src) { $('#ncSubject').value = src.subject; $('#ncLevel').value = levelKey(src); $('#ncRegime').value = src.regime; $('#ncHint').textContent = `Fica com os mesmos domínios, pesos, limiares dos níveis e critérios da escrita da turma ${src.name}. Pode alterá-los depois em «Editar turma».`; }
         else $('#ncHint').textContent = 'Os domínios e pesos aparecem preenchidos com um exemplo da disciplina. Pode alterá-los depois em «Editar turma».';
       };
       $('#ncFrom')?.addEventListener('change', fromChange); fromChange();
@@ -2243,8 +2250,10 @@ function newClassDialog(fromId = '') {
     actions: [{ label: 'Cancelar' }, { label: 'Criar turma', kind: 'primary', run: () => {
       const name = $('#ncName').value.trim(), subject = $('#ncSubject').value.trim(); if (!name) return mErr('Escreva o nome da turma.'); if (!subject) return mErr('Escreva a disciplina.');
       if (askTeacher) { APP.state.teacher.name = ($('#ncTeacher').value || '').trim(); APP.state.teacher.school = ($('#ncSchool').value || '').trim(); }
-      const c = newClass({ name, subject, level: $('#ncLevel').value, regime: $('#ncRegime').value, year: ($('#ncYear').value || '').trim() || anoLetivo() });
+      const lvSel = $('#ncLevel').value;
+      const c = newClass({ name, subject, level: lvSel === 'basico2' ? 'basico' : lvSel, regime: $('#ncRegime').value, year: ($('#ncYear').value || '').trim() || anoLetivo() });
       const src = cls.find(x => x.id === $('#ncFrom')?.value);
+      c.ciclo = lvSel === 'basico2' ? '2' : '3';
       if (src) copyClassSetup(src, c, { moments: !!$('#ncCopyMoments')?.checked, students: !!$('#ncCopyStudents')?.checked });
       APP.state.classes.push(c); changed();
       if ($('#ncFrom')?.value === '__import') { go('class', { classId: c.id, tab: 'config', term: 0 }); setTimeout(() => importGrelhaDialog(c, () => { go('class', { classId: c.id, tab: 'alunos', term: 0 }); setTimeout(() => addStudentsDialog(c), 150); }), 150); return; }
@@ -2409,7 +2418,7 @@ document.addEventListener('change', async e => {
     if (k === 'cumulative') c.cumulative = t.checked;
     else if (k === 'writingModel') c.writing = { ...(c.writing || {}), model: t.value };
     else if (k === 'regime') { if (t.value === 'semestres' && c.moments.some(m => m.term > 1)) { t.value = c.regime; return toast('Há momentos no 3.º período: mude-os de período antes.'); } c.regime = t.value; }
-    else if (k === 'level') { c.level = t.value; c.writing = { ...(c.writing || {}), model: t.value === 'basico' ? 'prova91' : 'exame639' }; if (t.value === 'profissional') { c.modules ||= []; if (!isNum(c.modMin)) c.modMin = 10; }
+    else if (k === 'level') { const lv = t.value === 'basico2' ? 'basico' : t.value; c.ciclo = t.value === 'basico2' ? '2' : '3'; c.level = lv; c.writing = { ...(c.writing || {}), model: lv === 'basico' ? 'prova91' : 'exame639' }; if (t.value === 'profissional') { c.modules ||= []; if (!isNum(c.modMin)) c.modMin = 10; }
       toast(t.value === 'basico' ? 'Níveis 1–5, cotações de 0 a 100 pontos e rubrica da Prova Final 91. As notas já lançadas mantêm-se.' : t.value === 'profissional' ? 'Ensino profissional: módulos/UFCD de 0 a 20, cotações de 0 a 200. Indique os módulos/UFCD.' : 'Escala 0–20, cotações de 0 a 200 pontos e rubrica do Exame 639.', 5000); }
     else if (t.tagName === 'SELECT') c[k] = t.value;
     changed(); render(); return;
@@ -2566,7 +2575,7 @@ function gridBasicHTML(c) {
       <td class="tn"><select class="final" data-tn="${r.s.id}|final" aria-label="Nível final de ${esc(r.s.name)}"><option value="">${r.prop !== null ? 'Proposta: ' + r.prop : '—'}</option>${[1, 2, 3, 4, 5].map(v => `<option ${r.fin === v ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td class="stc">${stCell}</td>${evoCells}</tr>`;
   }).join('');
-  return `<div class="phead"><div><h2>Grelha final de avaliação — 3.º ciclo · ${esc(T[t])}${last ? ' (final do ano)' : ''}</h2>
+  return `<div class="phead"><div><h2>Grelha final de avaliação — ${cic(c)} · ${esc(T[t])}${last ? ' (final do ano)' : ''}</h2>
       <p>Gerada automaticamente a partir dos momentos de avaliação. Resultado de cada domínio em % (0 a 100), percentagem global ponderada pelos pesos e proposta de nível (1 a 5) pelos limiares da turma. Valide a proposta ou ajuste o nível: cada alteração fica registada.${c.cumulative && t > 0 ? ' Avaliação contínua: inclui os momentos dos períodos anteriores.' : ''}</p></div>
     <div class="btnrow"><button class="btn ${inst ? 'on' : ''}" data-ginst>${ic('grid')}${inst ? 'Esconder' : 'Mostrar'} instrumentos</button><button class="btn" data-validate-all ${n.prop ? '' : 'disabled'}>${ic('check')}Validar todas as propostas${n.prop ? ` (${n.prop})` : ''}</button><button class="btn" data-gx>${ic('excel')}Excel</button><button class="btn primary" data-gp>${ic('print')}PDF / Imprimir</button></div></div>
     <div class="gsum"><span><b>${n.val}</b> validadas</span><span><b>${n.adj}</b> ajustadas</span><span><b>${n.prop}</b> por validar</span>${rows.some(r => r.stale) ? `<span class="stb eval">${rows.filter(r => r.stale).length} a rever (avaliações alteradas depois da decisão)</span>` : ''}<span class="hint">Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%</span></div>
@@ -2603,7 +2612,7 @@ async function excelGridBasic(c, t) {
   h1.push({ v: 'Proposta', s: 12 }, { v: '', s: 12 }, { v: 'Decisão do professor', s: 12 }, { v: '', s: 12 }, { v: 'Evolução (nível)', s: 3 }, ...T.slice(1).map(() => ({ v: '', s: 3 })), { v: 'Registo de alterações', s: 3 });
   h2.push({ v: 'Global %', s: 12 }, { v: 'Nível', s: 12 }, { v: 'Nível final', s: 12 }, { v: 'Estado', s: 12 }, ...T.map((x, i) => ({ v: `${i + 1}.º ${T.length === 2 ? 'sem.' : 'per.'}`, s: 3 })), { v: '', s: 3 });
   merges.push({ s: { r: 4, c: h1.length - 1 }, e: { r: 5, c: h1.length - 1 } });
-  const data = [[{ v: `Grelha final de avaliação — 3.º ciclo — ${T[t]}${t === T.length - 1 ? ' (final do ano)' : ''}`, s: 1 }], [{ v: `${c.subject} · Turma ${c.name} · Ano letivo ${c.year}${tch.school ? ' · ' + tch.school : ''}${tch.name ? ' · Prof. ' + tch.name : ''}`, s: 2 }], [{ v: `Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%. Resultados em % (0 a 100).`, s: 11 }], [], h1, h2];
+  const data = [[{ v: `Grelha final de avaliação — ${cic(c)} — ${T[t]}${t === T.length - 1 ? ' (final do ano)' : ''}`, s: 1 }], [{ v: `${c.subject} · Turma ${c.name} · Ano letivo ${c.year}${tch.school ? ' · ' + tch.school : ''}${tch.name ? ' · Prof. ' + tch.name : ''}`, s: 2 }], [{ v: `Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%. Resultados em % (0 a 100).`, s: 11 }], [], h1, h2];
   for (const r of rows) {
     const line = [{ v: r.s.n || '', s: 4 }, { v: r.s.name, s: 5 }];
     cols.forEach(({ d, ms }, k) => { ms.forEach(m => line.push(isAbsent(m, r.s.id) ? { v: 'F', s: 4 } : { v: n1(gShow(c, domainGrade(m, r.s.id, d.id))), s: 6 })); line.push({ v: n1(gShow(c, r.doms[k].g)), s: 14 }); });
@@ -2627,7 +2636,7 @@ function printGridBasic(c, t) {
   const body = st.map(r => `<tr><td class="n">${r.s.n || ''}</td><td class="nm">${esc(r.s.name)}</td>${cols.map(({ d, ms }, k) => ms.map(m => `<td>${isAbsent(m, r.s.id) ? 'F' : isNum(domainGrade(m, r.s.id, d.id)) ? fmt(gShow(c, domainGrade(m, r.s.id, d.id)), 0) : ''}</td>`).join('') + `<td class="avg">${r.doms[k].g === null ? '' : fmt(gShow(c, r.doms[k].g), 1)}</td>`).join('')}
     <td class="fin"><b>${r.fg ? fmt(r.fg.pct, 1) + (r.fg.missing.length ? '*' : '') : ''}</b></td><td class="fin"><b>${r.prop ?? ''}</b></td><td class="dec"><b>${r.fin ?? ''}</b></td><td class="dec" style="width:18mm;white-space:nowrap;font-weight:400;font-size:.72em">${r.stale ? 'Rever' : r.st === 'val' ? 'Validado' : r.st === 'adj' ? 'Ajustado' : r.st === 'prop' ? 'A validar' : ''}</td>${r.evo.map(e => `<td${e && !e.dec ? ' style="color:#8a9a95;font-style:italic"' : ''}>${e ? e.v : ''}</td>`).join('')}</tr>`).join('');
   const legend = moms.map(m => `<b>${esc(shortName(m))}</b> ${esc(m.name)}${m.term !== t ? ' (' + esc(T[m.term]) + ')' : ''}${Number(m.weight) === 2 ? ' ×2' : ''}`).join(' · ');
-  printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Grelha final de avaliação — 3.º ciclo', T[t] + (t === T.length - 1 ? ' (final do ano)' : '') + ' · Níveis 1 a 5')}
+  printDoc(`<div class="pdoc pauta" style="--fs:${fs}pt">${docHeader(c, 'Grelha final de avaliação — ' + cic(c), T[t] + (t === T.length - 1 ? ' (final do ano)' : '') + ' · Níveis 1 a 5')}
     <table class="pt"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>
     <footer class="pf"><span>${legend || 'Sem momentos de avaliação.'}<br>${distributionLine(c, t) ? '<b>' + esc(distributionLine(c, t)) + '.</b><br>' : ''}Resultados em % (0 a 100). Global = soma de (resultado do domínio × peso)${rows.some(r => r.fg?.missing.length) ? ' (* = falta a nota de algum domínio; pesos redistribuídos)' : ''} · Níveis: 2 ≥ ${c.levelCuts[0]}% · 3 ≥ ${c.levelCuts[1]}% · 4 ≥ ${c.levelCuts[2]}% · 5 ≥ ${c.levelCuts[3]}%. Evolução a itálico: proposta ainda não decidida. F = faltou.</span>
     <span class="sign">O(A) professor(a): ______________________________ &nbsp; Data: ____/____/______<br><small class="plic">${esc(licenseLine())}</small> ${pautaMark()}</span></footer></div>`, { landscape: true, title: 'Grelha final ' + c.name + ' ' + T[t] });
@@ -3412,6 +3421,9 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('keydown', e => { const el = e.target; if (el.matches?.('[data-newest]') && e.key === 'Enter') { e.preventDefault(); el.parentElement.querySelector('[data-addest]')?.click(); } });
 
+// número da versão (barra lateral e Ajuda): abre a lista de novidades
+document.addEventListener('click', e => { if (!e.target.closest('[data-versao]')) return; modal({ title: `Novidades da PAUTA ${PAUTA_VERSAO}`, body: `<ul style="margin:0;padding-left:1.2em;line-height:1.6">${NOVIDADES.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`, actions: [{ label: 'Fechar', kind: 'primary' }] }); });
+
 // =====================================================================================
 // PAUTA 3.2 — importar a grelha de critérios da escola (domínios e pesos).
 // Lê Excel (.xlsx, .xls, .ods, .csv), Word (.docx), PDF com texto ou texto colado.
@@ -3733,11 +3745,11 @@ function importGrelhaDialog(c, then = null) {
       <div class="dlist">${S.rows.map((r, i) => `<div class="drow"><input data-gin="${i}" value="${esc(r.name)}" aria-label="Domínio"><span class="wbox"><input data-giw="${i}" value="${fmtMax(r.w)}" inputmode="decimal" aria-label="Peso"><span>%</span></span>
         ${isPortuguese(c) ? `<label class="rubchk"><input type="checkbox" data-giwr="${i}" ${r.writing ? 'checked' : ''}>Escrita (rubrica)</label>` : ''}${r.grupo ? `<small class="gigrp">em ${esc(r.grupo)}</small>` : ''}<button type="button" class="btn xs icon" data-gidel="${i}" aria-label="Apagar">${ic('trash')}</button></div>`).join('')}</div>
       <button type="button" class="btn sm" data-giadd>${ic('plus')}Acrescentar domínio</button>
-      ${S.cuts ? `<label class="copyrow" style="margin-top:12px"><input type="checkbox" data-gicuts ${S.useCuts ? 'checked' : ''}><span><b>Níveis do 3.º ciclo encontrados na grelha</b><small>Nível 2 ≥ ${S.cuts[0]}% · 3 ≥ ${S.cuts[1]}% · 4 ≥ ${S.cuts[2]}% · 5 ≥ ${S.cuts[3]}% (aplica-se só às turmas do 3.º ciclo)</small></span></label>` : ''}
+      ${S.cuts ? `<label class="copyrow" style="margin-top:12px"><input type="checkbox" data-gicuts ${S.useCuts ? 'checked' : ''}><span><b>Níveis (2.º e 3.º ciclos) encontrados na grelha</b><small>Nível 2 ≥ ${S.cuts[0]}% · 3 ≥ ${S.cuts[1]}% · 4 ≥ ${S.cuts[2]}% · 5 ≥ ${S.cuts[3]}% (aplica-se só às turmas do 2.º e do 3.º ciclo)</small></span></label>` : ''}
       ${instsHTML()}
       ${used.length ? `<h3 class="gih">Notas já lançadas</h3><p class="hint">Estes domínios da turma já têm notas. Diga a que domínio novo correspondem, para não perder nada.</p>
         <div class="gimap">${used.map(d => `<div class="gimrow"><span><b>${esc(d.name)}</b></span><span>→</span><select data-gimap="${d.id}">${S.rows.map((r, i) => `<option value="${i}" ${S.map[d.id] === i ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="-1" ${S.map[d.id] === -1 ? 'selected' : ''}>Não corresponde: manter com peso 0%</option></select></div>`).join('')}</div>` : ''}
-      ${others.length ? `<h3 class="gih">Usar a mesma grelha noutras turmas</h3><div class="copylist">${others.map(x => `<label class="copyrow"><input type="checkbox" data-gialso="${x.id}" ${S.also[x.id] ? 'checked' : ''}><span><b>${esc(x.name)}</b><small>${esc(x.subject)} · ${esc(LEVEL_TAG[x.level] || '')}. As notas mantêm-se nos domínios com o mesmo nome.</small></span></label>`).join('')}</div>` : ''}`;
+      ${others.length ? `<h3 class="gih">Usar a mesma grelha noutras turmas</h3><div class="copylist">${others.map(x => `<label class="copyrow"><input type="checkbox" data-gialso="${x.id}" ${S.also[x.id] ? 'checked' : ''}><span><b>${esc(x.name)}</b><small>${esc(x.subject)} · ${esc(levelTag(x))}. As notas mantêm-se nos domínios com o mesmo nome.</small></span></label>`).join('')}</div>` : ''}`;
   };
   const load = async (box, promise, label) => {
     const info = box.querySelector('#giInfo'); info.textContent = 'A ler ' + label + '…';
@@ -3812,10 +3824,10 @@ function applyGrelha(cls, rows, map, cuts) {
   if (cuts && isBasic(cls)) cls.levelCuts = cuts.slice();
 }
 async function exportGrelha(c) {
-  const rows = [[`Grelha de critérios — ${c.subject} — ${LEVEL_LABEL[c.level] || ''}`], [], ['Domínio', 'Peso']];
+  const rows = [[`Grelha de critérios — ${c.subject} — ${c.level === 'basico' ? cic(c) + ' (níveis 1 a 5)' : (LEVEL_LABEL[c.level] || '')}`], [], ['Domínio', 'Peso']];
   c.domains.filter(d => Number(d.weight) > 0).forEach(d => rows.push([d.name, fmtMax(d.weight) + '%']));
   rows.push(['Total', '100%']);
-  if (isBasic(c)) { rows.push([], ['Níveis (3.º ciclo)', 'A partir de']); c.levelCuts.forEach((x, i) => rows.push(['Nível ' + (i + 2), x + '%'])); }
+  if (isBasic(c)) { rows.push([], [`Níveis (${cic(c)})`, 'A partir de']); c.levelCuts.forEach((x, i) => rows.push(['Nível ' + (i + 2), x + '%'])); }
   rows.push([], ['Ficheiro criado pela PAUTA. Pode alterá-lo e voltar a importá-lo em «Editar turma › Importar grelha».']);
   await saveSheet(rows, 'Grelha', `PAUTA_grelha_${safeName(c.subject)}.xlsx`, { widths: [40, 14] });
   toast('Grelha guardada nas Transferências. Pode partilhá-la com colegas.');
