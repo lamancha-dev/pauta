@@ -376,6 +376,13 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 }
 .tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}.tabs button{white-space:nowrap;padding:10px 12px;gap:6px}
 @media (max-width:1420px){.tabs button .ic{display:none}.tabs button{padding:10px 11px}}
+.giinsts{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto;padding-right:4px}
+.giinst{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:#fbfcfb}.giinst.on{border-color:#b9d6c8;background:var(--mark2)}
+.giihead{display:flex;align-items:center;gap:10px;cursor:pointer}.giihead small{color:var(--graph);white-space:nowrap}
+.giname{flex:1;min-width:0;height:34px;border:1px solid #cfdad5;border-radius:8px;padding:0 10px;font-weight:600;background:#fff}
+.gigroups{display:flex;flex-direction:column;gap:5px;margin:8px 0 2px 26px}
+.gigroup{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}.gigroup select{height:32px;border:1px solid #cfdad5;border-radius:8px;padding:0 6px;max-width:260px}
+.gigroup.off span{color:var(--graph);text-decoration:line-through}.gigroup i{color:var(--pen2)}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -1450,7 +1457,7 @@ function helpHTML() {
     <li><b>Grelha final · 3.º ciclo</b> (separador da turma): reúne sozinha todos os alunos e avaliações, mostra o resultado de cada domínio, a percentagem global, a proposta de nível (1 a 5) e a evolução de período para período. O professor valida a proposta ou ajusta o nível; cada alteração fica registada. Exporta para Excel e PDF.</li>
     <li><b>Sínteses</b> (separador da turma): escolha as frases de cada aluno em cada período; a PAUTA sugere as do aproveitamento, da evolução e dos domínios a partir das notas. Marque as <b>medidas universais</b> e as estratégias que usou. O texto escreve-se sozinho, pode corrigi-lo à mão e copiá-lo para o Inovar. Imprime e exporta para Excel.</li>
     <li><b>Balanço da turma</b>: os números do período (positivas, média, domínios) e frases pré-feitas para o balanço que entrega nos conselhos de turma.</li>
-    <li><b>Grelha da escola</b>: em «Editar turma», «Importar grelha da escola» lê os domínios e as percentagens de um Excel, Word ou PDF. Confirma antes de aplicar e pode usar a mesma grelha noutras turmas.</li>
+    <li><b>Grelha da escola</b>: em «Editar turma», «Importar grelha da escola» lê os domínios e as percentagens de um Excel, Word ou PDF. Num Excel, encontra também os testes e trabalhos (as perguntas, as cotações e o domínio de cada pergunta) e cria-os na turma, prontos a corrigir. Confirma tudo antes de aplicar e pode usar a mesma grelha noutras turmas.</li>
     <li><b>Ensino profissional</b>: em «Editar turma» indique os módulos/UFCD da disciplina; cada momento de avaliação pertence a um módulo. A <b>Grelha final · Profissional</b> calcula a classificação de cada módulo (0 a 20) com os domínios e pesos da turma, mostra os módulos concluídos, não concluídos e em avaliação, o percurso de cada aluno e a grelha global da turma. Exporta para Excel e PDF.</li>
   </ol>
   <h2>Como é calculada a classificação</h2>
@@ -2129,7 +2136,7 @@ const NOVIDADES = [
   'Novo separador «Sínteses»: síntese descritiva de cada aluno com frases pré-feitas (aproveitamento, evolução, domínios, empenho, comportamento, métodos de trabalho, assiduidade e recomendações). A PAUTA sugere frases a partir das notas e o texto pode ser corrigido à mão, copiado para o Inovar, impresso ou exportado para Excel.',
   'Medidas universais (DL 54/2018) nas sínteses: diferenciação pedagógica, acomodações curriculares, enriquecimento curricular, promoção do comportamento pró-social e intervenção em pequenos grupos, cada uma com as estratégias que usou. Pode aplicar as mesmas medidas a vários alunos de uma vez.',
   'Novo separador «Balanço da turma» por período, com os números da pauta (positivas, média, domínios mais fortes e mais fracos, evolução) e texto pré-feito.',
-  'Editar turma › «Importar grelha da escola»: a PAUTA lê os domínios e as ponderações de um ficheiro Excel, Word ou PDF (incluindo grelhas com subdomínios e níveis do 3.º ciclo) e aplica-os sem perder as notas.',
+  'Editar turma › «Importar grelha da escola»: a PAUTA lê os domínios e as ponderações de um ficheiro Excel, Word ou PDF (incluindo grelhas com subdomínios e níveis do 3.º ciclo) e, num Excel, também os testes e trabalhos com as perguntas e as cotações, que ficam prontos a corrigir. As notas já lançadas não se perdem.',
   'Em «As minhas frases» pode acrescentar frases e estratégias suas ou esconder as que não usa.',
 ];
 async function mostrarNovidades(then) {
@@ -3474,14 +3481,15 @@ function giSheetEntries(X, ws) {
 // ---------------------------------------------------------------- texto (Word, PDF, colado)
 function giTextEntries(text) {
   const entries = []; const levels = []; let pending = ''; let row = 0;
-  for (const raw of String(text || '').split(/\r?\n/)) {
+  for (const raw of String(text || '').split(/\r?\n|;\s+(?=n[ií]vel)/i)) {
     const line = raw.replace(/ /g, ' ').trim(); row++;
     if (!line) continue;
     const range = /(\d{1,3}(?:[.,]\d+)?)\s*%?\s*(?:a|-|–|—|até|ao?)\s*(\d{1,3}(?:[.,]\d+)?)\s*%/i.exec(line.replace(/\bn[ií]vel\s*[1-5]\b/gi, ' '));
     if (range) { const lv = GI_LEVEL.exec(line) || GI_LEVEL.exec(pending); if (lv) levels.push({ name: 'Nível ' + lv[1], w: giNum(range[1]) }); continue; }
     const re = /(\d{1,3}(?:[.,]\d{1,2})?)\s*%/g; let m, last = 0, found = false;
     while ((m = re.exec(line))) {
-      const w = giNum(m[1]); let lab = line.slice(last, m.index).replace(/\t+/g, ' '); last = m.index + m[0].length;
+      const w = giNum(m[1]); const seg = line.slice(last, m.index); last = m.index + m[0].length;
+      let lab = seg.includes('\t') ? (seg.split('\t').map(x => x.trim()).find(x => giHasLetters(x) && !GI_STOP.test(giClean(x))) || seg.replace(/\t+/g, ' ')) : seg;
       let cl = giClean(lab);
       if (!giHasLetters(cl) || GI_STOP.test(cl)) cl = GI_LEVEL.test(lab) ? lab : pending;
       if (cl && w > 0 && w <= 100) { entries.push({ r: row, c: m.index, name: cl, w }); found = true; }
@@ -3550,11 +3558,13 @@ function giCandidates(groups, fonte, levels) {
   return out;
 }
 async function giReadFile(f) {
-  const ext = f.name.split('.').pop().toLowerCase(); let cands = []; const levels = [];
+  const ext = f.name.split('.').pop().toLowerCase(); let cands = []; const levels = []; const insts = [];
   if (['xlsx', 'xlsm', 'xls', 'ods', 'csv'].includes(ext)) {
     const X = await loadXLSX(); const wb = X.read(await f.arrayBuffer(), { type: 'array' });
     for (const name of wb.SheetNames) {
       const ws = wb.Sheets[name]; const { entries, plain } = giSheetEntries(X, ws);
+      try { insts.push(...giSheetInstruments(X, ws, name)); } catch (e) { }
+      try { levels.push(...giTextEntries(X.utils.sheet_to_csv(ws, { FS: '\t' })).levels); } catch (e) { }
       const byRow = {}, byCol = {}; entries.forEach(e => { (byRow[e.r] ||= []).push(e); (byCol[e.c] ||= []).push(e); });
       const groups = [...Object.values(byRow), ...Object.values(byCol), entries.slice(), ...plain].filter(g => g.length >= 2).map(g => g.slice().sort((a, b) => a.r - b.r || a.c - b.c));
       cands.push(...giCandidates(groups, name, levels));
@@ -3578,7 +3588,7 @@ async function giReadFile(f) {
     } else text = await f.text();
     cands = giFromText(text, f.name, levels);
   }
-  return giSummarize(cands, levels);
+  const fontes = new Set(cands.map(c => c.fonte)); const r = giSummarize(cands, levels); r.insts = insts.filter(x => !fontes.has(x.sheet)); return r;
 }
 function giFromText(text, fonte, levels) {
   const { entries, levels: lv } = giTextEntries(text); levels.push(...lv);
@@ -3591,10 +3601,125 @@ function giSummarize(cands, levels) {
   return { cands: list.filter(c => c.ok).length ? list.filter(c => c.ok) : list, cuts: giLevelCuts(levels) };
 }
 
+// ---------------------------------------------------------------- testes e trabalhos (instrumentos) numa folha de cálculo
+// Procura, em cada folha, uma linha (ou coluna) de cotações: números de cada pergunta, com o rótulo
+// «Cotação», «Pontos», «Valores»… ou logo por baixo da linha das perguntas. Para cada pergunta guarda
+// os textos que estão por cima (ou na mesma linha, no formato vertical): servem para descobrir o
+// número da pergunta e o domínio a que pertence, comparando com os domínios da grelha.
+const GI_COT = /^(cota[cç][aã]o|cota[cç][oõ]es|pontos|pontua[cç][aã]o|pts|points|valores|m[aá]x|pontos m[aá]x)/i;
+const GI_TOT = /^(total|sub-?total|soma|m[eé]dia|nota|classifica|%|percent|resultado)/i;
+const GI_ITEMWORD = /^(itens?|quest[oõ]es|quest[aã]o|perguntas?|exerc[ií]cios?|n\.?\s*º|nome|grupo|parte|dom[ií]nio)s?$/i;
+function giSheetInstruments(X, ws, sheetName) {
+  if (!ws || !ws['!ref']) return [];
+  const R = X.utils.decode_range(ws['!ref']); const maxR = Math.min(R.e.r, R.s.r + 150), maxC = Math.min(R.e.c, R.s.c + 60);
+  const merges = ws['!merges'] || [];
+  const at = (r, c) => ws[X.utils.encode_cell({ r, c })];
+  const txt = (r, c) => {
+    if (r < 0 || c < 0) return '';
+    let cell = at(r, c);
+    if (!cell || cell.v === undefined || cell.v === '') { const m = merges.find(m => r >= m.s.r && r <= m.e.r && c >= m.s.c && c <= m.e.c); if (m) { if (m.e.c - m.s.c > 12) return ''; cell = at(m.s.r, m.s.c); } }
+    if (!cell || cell.v === undefined || cell.v === null) return '';
+    if (cell.t === 'n' && /%/.test(cell.w || '')) return '';
+    return String(cell.w ?? cell.v).replace(/\s+/g, ' ').trim();
+  };
+  const num = (r, c) => { const cell = at(r, c); if (!cell || cell.t !== 'n' || cell.f || /%/.test(cell.w || '')) return null; const v = Number(cell.v); return v > 0 && v <= 200 ? v : null; };
+  const out = [];
+  // --- formato horizontal: uma linha com as cotações
+  const rowNums = r => { const a = []; for (let c = R.s.c; c <= maxC; c++) { const v = num(r, c); if (v !== null) a.push({ c, v }); } return a; };
+  const rowLabel = r => { for (let c = R.s.c; c <= Math.min(maxC, R.s.c + 3); c++) { const t = txt(r, c); if (t && !/^\d+([.,]\d+)?$/.test(t)) return t; } return ''; };
+  const firstIsNum = r => { const cell = at(r, R.s.c); return !!cell && cell.t === 'n'; };
+  let rows = [];
+  for (let r = R.s.r; r <= maxR; r++) { const lab = rowLabel(r); if (lab && GI_COT.test(lab) && rowNums(r).length >= 2) rows.push(r); }
+  if (!rows.length) {
+    let pick = -1;
+    for (let r = R.s.r + 1; r <= maxR; r++) {
+      if (firstIsNum(r)) { if (pick >= 0) break; continue; }
+      const n = rowNums(r); if (n.length < 2 || sum(n.map(x => x.v)) < 10) continue;
+      if (n.filter(x => txt(r - 1, x.c)).length >= Math.ceil(n.length * 0.6)) pick = r;
+    }
+    if (pick >= 0) rows.push(pick);
+  }
+  rows.forEach((r, k) => {
+    const items = []; const nums = rowNums(r); const isItemCol = new Set(nums.map(x => x.c)); const firstItem = nums.length ? nums[0].c : 0;
+    for (const { c, v } of nums) {
+      const labels = [], hdrs = [];
+      for (let rr = r - 1; rr >= Math.max(R.s.r, r - 7); rr--) {
+        const t = txt(rr, c); if (t) { labels.push(t); hdrs.push(t); continue; }
+        for (let cc = c - 1; cc >= Math.max(R.s.c, c - 12); cc--) { if (!isItemCol.has(cc) && cc > firstItem) break; const x = txt(rr, cc); if (x) { hdrs.push(x); break; } }
+      }
+      if (labels.length && GI_TOT.test(labels[0])) continue;
+      // cabeçalho do bloco escrito à esquerda da primeira pergunta (ex.: «Conhecimento» na coluna dos nomes)
+      for (let rr = r - 1; rr >= Math.max(R.s.r, r - 7); rr--) for (let cc = firstItem - 1; cc >= R.s.c; cc--) { const x = txt(rr, cc); if (x) { hdrs.push(x); break; } }
+      items.push({ labels, hdrs, max: v });
+    }
+    if (items.length >= 2) out.push({ name: sheetName + (rows.length > 1 ? ` (${k + 1})` : ''), sheet: sheetName, items });
+  });
+  if (out.length) return out;
+  // --- formato vertical: uma coluna «Cotação» com uma pergunta por linha
+  for (let r = R.s.r; r <= maxR && !out.length; r++) for (let c = R.s.c; c <= maxC; c++) {
+    const h = txt(r, c); if (!h || !GI_COT.test(h)) continue;
+    let labCol = -1, domCol = -1;
+    for (let cc = R.s.c; cc <= maxC; cc++) { if (cc === c) continue; const x = txt(r, cc); if (/^(dom[ií]nio|compet|[aá]rea|skill|crit[eé]rio)/i.test(x)) domCol = cc; else if (/^(item|quest|pergunta|exerc|n\.?\s*º|exercise|question)/i.test(x)) labCol = cc; }
+    const items = []; let section = '', empties = 0;
+    for (let rr = r + 1; rr <= maxR && empties < 3; rr++) {
+      const v = num(rr, c);
+      const left = []; for (let cc = R.s.c; cc < c; cc++) { const x = txt(rr, cc); if (x) left.push({ cc, x }); }
+      if (v === null) { if (left.length) { const x = left[0].x; if (GI_TOT.test(x) || left.some(l => GI_TOT.test(l.x))) break; section = x; empties = 0; } else empties++; continue; }
+      empties = 0;
+      if (left.some(l => GI_TOT.test(l.x))) break;
+      const lab = labCol >= 0 ? txt(rr, labCol) : (left.filter(l => l.cc !== domCol).map(l => l.x).pop() || '');
+      const hdrs = [domCol >= 0 ? txt(rr, domCol) : '', ...left.map(l => l.x), section].filter(Boolean);
+      items.push({ labels: [lab].filter(Boolean), hdrs, max: v, part: left[0]?.x || '' });
+    }
+    if (items.length >= 2) { out.push({ name: sheetName, sheet: sheetName, items }); break; }
+  }
+  return out;
+}
+// semelhança entre um texto da folha e o nome de um domínio
+function giDomMatch(text, name) {
+  const words = s => normalize(s).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !['dos', 'das', 'com', 'para', 'grupo', 'grelha', 'ficha', 'teste'].includes(w)).map(w => w.replace(/s$/, ''));
+  const a = normalize(text).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(), b = normalize(name).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!a || !b) return false; if (a === b) return true;
+  if (b.length >= 4 && a.includes(b)) return true; if (a.length >= 5 && b.includes(a)) return true;
+  const wa = words(text), wb = words(name); if (!wa.length || !wb.length) return false;
+  const [sh, lg] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+  if (sh.length === 1) return sh[0].length >= 6 && lg.includes(sh[0]);
+  return sh.every(w => lg.includes(w));
+}
+// escolhe o domínio e o número de cada pergunta, a partir dos domínios atuais da grelha
+function giInstPlan(inst, rows) {
+  const dom = it => { for (const h of it.hdrs) { const i = rows.findIndex(r => giDomMatch(h, r.name)); if (i >= 0) return i; } const i = rows.findIndex(r => giDomMatch(inst.sheet, r.name)); return i; };
+  const items = inst.items.map(it => ({ ...it, d: dom(it) }));
+  const cnt = {};
+  items.forEach(it => {
+    cnt[it.d] = (cnt[it.d] || 0) + 1;
+    const lab = it.labels.find(l => l.length <= 24 && !GI_ITEMWORD.test(l) && !rows.some(r => giDomMatch(l, r.name)) && !GI_COT.test(l));
+    it.label = lab ? (it.part && it.labels.length === 1 && /^\d+$/.test(lab) ? it.part.slice(0, 6) + '.' + lab : lab) : String(cnt[it.d]);
+  });
+  // grupos de perguntas seguidas com o mesmo domínio
+  const groups = [];
+  items.forEach((it, i) => { const g = groups[groups.length - 1]; if (g && g.d === it.d) g.items.push(it); else groups.push({ key: i, d: it.d, items: [it] }); });
+  // um grupo sem domínio cuja soma é igual à cotação de outra pergunta é o detalhe dessa pergunta (ex.: grelha da escrita)
+  groups.forEach(g => { if (g.d >= 0) return; const tot = round(sum(g.items.map(x => x.max)), 2); g.detail = items.some(x => x.d >= 0 && Math.abs(x.max - tot) < 0.01); });
+  return groups;
+}
 // ---------------------------------------------------------------- janela de importação
 function importGrelhaDialog(c, then = null) {
   const after = () => { if (then) setTimeout(then, 60); };
-  const S = { cands: [], pick: 0, rows: [], cuts: null, useCuts: true, map: {}, also: {}, file: '' };
+  const S = { cands: [], pick: 0, rows: [], cuts: null, useCuts: true, map: {}, also: {}, file: '', insts: [], term: isProf(c) ? 0 : view.term };
+  const eff = (inst, g) => inst.ov[g.key] !== undefined ? inst.ov[g.key] : g.d >= 0 ? g.d : -2;
+  const initInsts = list => { S.insts = (list || []).map(x => ({ ...x, name: String(x.name).replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), ov: {}, on: giInstPlan(x, S.rows).some(g => g.d >= 0) })); };
+  const instsHTML = () => {
+    if (!S.insts.length) return '';
+    const opts = (sel, detail) => S.rows.map((r, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${esc(r.name)}</option>`).join('') + `<option value="-2" ${sel === -2 ? 'selected' : ''}>${detail ? 'Não importar (é o detalhe de outra pergunta)' : 'Não importar'}</option>`;
+    const nOn = S.insts.filter(x => x.on).length;
+    return `<h3 class="gih">Testes e trabalhos encontrados no ficheiro <span class="wsum ok">${nOn} de ${S.insts.length}</span></h3>
+      <p class="hint">Cada folha com perguntas e cotações pode entrar na turma como um momento de avaliação, já com as perguntas e as cotações, pronto a corrigir. Marque os que quer trazer e confirme o domínio de cada grupo de perguntas. As notas dos alunos não são importadas.</p>
+      ${isProf(c) ? '' : `<div class="fgrid" style="margin:6px 0 10px;max-width:320px"><label class="f">Pôr os testes no<select data-giterm>${terms(c).map((t, i) => `<option value="${i}" ${i === S.term ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>`}
+      <div class="giinsts">${S.insts.map((x, i) => { const gs = giInstPlan(x, S.rows); return `<div class="giinst ${x.on ? 'on' : ''}">
+        <label class="giihead"><input type="checkbox" data-gion="${i}" ${x.on ? 'checked' : ''}><input class="giname" data-giname="${i}" value="${esc(x.name)}" aria-label="Nome do momento"><small>folha «${esc(x.sheet)}»</small></label>
+        ${x.on ? `<div class="gigroups">${gs.map(g => { const e = eff(x, g); return `<div class="gigroup ${e < 0 ? 'off' : ''}"><select data-gigrp="${i}|${g.key}">${opts(e, g.detail)}</select><span>${g.items.length} pergunta${g.items.length === 1 ? '' : 's'} (${g.items.slice(0, 8).map(it => esc(it.label)).join(', ')}${g.items.length > 8 ? '…' : ''}) · <b>${fmtMax(sum(g.items.map(it => it.max)))} pontos</b>${g.d < 0 && !g.detail ? ' · <i>domínio não reconhecido</i>' : ''}</span></div>`; }).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
+  };
   const used = c.domains.filter(d => c.moments.some(m => momentDomainIds(c, m).includes(d.id)));
   const guess = d => { const n = normalize(d.name); let i = S.rows.findIndex(r => normalize(r.name) === n); if (i >= 0) return i; i = S.rows.findIndex(r => { const m = normalize(r.name); return m && (m.includes(n) || n.includes(m) || m.split(' ')[0] === n.split(' ')[0]); }); return i; };
   const setPick = i => { S.pick = i; S.rows = (S.cands[i]?.rows || []).map(r => ({ ...r, writing: isWritingName(r.name) })); S.map = {}; used.forEach(d => { const g = guess(d); S.map[d.id] = g >= 0 ? g : -1; }); };
@@ -3609,6 +3734,7 @@ function importGrelhaDialog(c, then = null) {
         ${isPortuguese(c) ? `<label class="rubchk"><input type="checkbox" data-giwr="${i}" ${r.writing ? 'checked' : ''}>Escrita (rubrica)</label>` : ''}${r.grupo ? `<small class="gigrp">em ${esc(r.grupo)}</small>` : ''}<button type="button" class="btn xs icon" data-gidel="${i}" aria-label="Apagar">${ic('trash')}</button></div>`).join('')}</div>
       <button type="button" class="btn sm" data-giadd>${ic('plus')}Acrescentar domínio</button>
       ${S.cuts ? `<label class="copyrow" style="margin-top:12px"><input type="checkbox" data-gicuts ${S.useCuts ? 'checked' : ''}><span><b>Níveis do 3.º ciclo encontrados na grelha</b><small>Nível 2 ≥ ${S.cuts[0]}% · 3 ≥ ${S.cuts[1]}% · 4 ≥ ${S.cuts[2]}% · 5 ≥ ${S.cuts[3]}% (aplica-se só às turmas do 3.º ciclo)</small></span></label>` : ''}
+      ${instsHTML()}
       ${used.length ? `<h3 class="gih">Notas já lançadas</h3><p class="hint">Estes domínios da turma já têm notas. Diga a que domínio novo correspondem, para não perder nada.</p>
         <div class="gimap">${used.map(d => `<div class="gimrow"><span><b>${esc(d.name)}</b></span><span>→</span><select data-gimap="${d.id}">${S.rows.map((r, i) => `<option value="${i}" ${S.map[d.id] === i ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="-1" ${S.map[d.id] === -1 ? 'selected' : ''}>Não corresponde: manter com peso 0%</option></select></div>`).join('')}</div>` : ''}
       ${others.length ? `<h3 class="gih">Usar a mesma grelha noutras turmas</h3><div class="copylist">${others.map(x => `<label class="copyrow"><input type="checkbox" data-gialso="${x.id}" ${S.also[x.id] ? 'checked' : ''}><span><b>${esc(x.name)}</b><small>${esc(x.subject)} · ${esc(LEVEL_TAG[x.level] || '')}. As notas mantêm-se nos domínios com o mesmo nome.</small></span></label>`).join('')}</div>` : ''}`;
@@ -3617,12 +3743,13 @@ function importGrelhaDialog(c, then = null) {
     const info = box.querySelector('#giInfo'); info.textContent = 'A ler ' + label + '…';
     try {
       const r = await promise; S.cands = r.cands; S.cuts = r.cuts; S.file = label;
+      if (!S.cands.length && r.insts?.length) { S.cands = [{ fontes: ['domínios atuais da turma'], rows: c.domains.filter(d => Number(d.weight) > 0).map(d => ({ name: d.name, w: d.weight, grupo: '' })), ok: true }]; setPick(0); initInsts(r.insts); info.textContent = `${label}: não tem critérios com percentagens, mas encontrei ${S.insts.length} teste(s) ou trabalho(s). A turma mantém os domínios e os pesos atuais.`; out(box); return; }
       if (!S.cands.length) { info.textContent = r.cuts ? 'Encontrei os níveis, mas não encontrei domínios com percentagens.' : 'Não encontrei domínios com percentagens. Experimente colar o texto da grelha (por exemplo: «Leitura 20%», uma linha por domínio).'; if (r.cuts) { S.rows = c.domains.map(d => ({ name: d.name, w: d.weight, writing: d.writing })); S.cands = [{ fontes: ['grelha atual'], rows: S.rows, ok: true }]; setPick(0); } out(box); return; }
-      setPick(0); info.textContent = `${label}: ${S.cands[0].rows.length} domínios encontrados.`; out(box);
+      setPick(0); initInsts(r.insts); info.textContent = `${label}: ${S.cands[0].rows.length} domínios encontrados${S.insts.length ? ` e ${S.insts.length} teste(s) ou trabalho(s)` : ''}.`; out(box);
     } catch (err) { info.textContent = 'Não foi possível ler: ' + (err.message || err); }
   };
-  modal({ title: 'Importar a grelha de critérios', wide: true,
-    intro: 'Escolha o ficheiro com os critérios e as ponderações da escola (Excel, Word ou PDF). A PAUTA procura os domínios e as percentagens, mostra o que encontrou e só aplica depois de confirmar. As notas já lançadas não se perdem.',
+  modal({ title: 'Importar a grelha', wide: true,
+    intro: 'Escolha o ficheiro com os critérios e as ponderações da escola (Excel, Word ou PDF) ou a sua grelha de testes em Excel. A PAUTA procura os domínios e as percentagens e, num Excel, também os testes e trabalhos com as perguntas e as cotações. Mostra tudo o que encontrou e só aplica depois de confirmar. As notas já lançadas não se perdem.',
     body: `<div class="importbox"><label class="btn primary">${ic('upload')}Escolher ficheiro<input type="file" id="giFile" accept=".xlsx,.xlsm,.xls,.ods,.csv,.docx,.pdf,.txt" hidden></label><span class="hint" id="giInfo">Excel, Word (.docx), PDF com texto ou .txt</span></div>
       <details class="gipaste"><summary>Ou cole aqui o texto da grelha</summary><textarea id="giText" rows="6" placeholder="Leitura 20%&#10;Escrita 25%&#10;Oralidade 15%&#10;…&#10;&#10;Também funciona com subdomínios:&#10;Atitudes 20%&#10;   Responsabilidade 10%&#10;   Participação 10%"></textarea><button type="button" class="btn sm" data-giread>Ler o texto</button></details>
       <div id="giOut"></div>`,
@@ -3631,17 +3758,21 @@ function importGrelhaDialog(c, then = null) {
       box.addEventListener('click', e => {
         let el;
         if (e.target.closest('[data-giread]')) { const txt = box.querySelector('#giText').value; const lv = []; const cands = giFromText(txt, 'texto colado', lv); return load(box, Promise.resolve(giSummarize(cands, lv)), 'texto colado'); }
-        if ((el = e.target.closest('[data-gidel]'))) { const i = Number(el.dataset.gidel); S.rows.splice(i, 1); for (const k in S.map) { if (S.map[k] === i) S.map[k] = -1; else if (S.map[k] > i) S.map[k]--; } return out(box); }
+        if ((el = e.target.closest('[data-gidel]'))) { const i = Number(el.dataset.gidel); S.rows.splice(i, 1); for (const k in S.map) { if (S.map[k] === i) S.map[k] = -1; else if (S.map[k] > i) S.map[k]--; } S.insts.forEach(x => { for (const k in x.ov) { if (x.ov[k] === i) x.ov[k] = -2; else if (x.ov[k] > i) x.ov[k]--; } }); return out(box); }
         if (e.target.closest('[data-giadd]')) { S.rows.push({ name: 'Novo domínio', w: 0, grupo: '', writing: false }); out(box); return box.querySelector(`[data-gin="${S.rows.length - 1}"]`)?.select(); }
       });
       box.addEventListener('input', e => {
         const el = e.target;
+        if (el.dataset.giname !== undefined) { S.insts[Number(el.dataset.giname)].name = el.value; return; }
         if (el.dataset.gin !== undefined) { S.rows[Number(el.dataset.gin)].name = el.value; box.querySelectorAll('[data-gimap] option').forEach(o => { if (o.value === el.dataset.gin) o.textContent = el.value; }); return; }
         if (el.dataset.giw !== undefined) { const v = parseNum(el.value); S.rows[Number(el.dataset.giw)].w = Number.isFinite(v) ? v : 0; const t = tot(); const s = box.querySelector('#giSum'); s.textContent = fmtMax(t) + '%'; s.className = 'wsum ' + (Math.abs(t - 100) < 0.01 ? 'ok' : 'bad'); }
       });
       box.addEventListener('change', e => {
         const el = e.target;
-        if (el.name === 'giPick') { setPick(Number(el.value)); return out(box); }
+        if (el.name === 'giPick') { setPick(Number(el.value)); S.insts.forEach(x => { x.ov = {}; }); return out(box); }
+        if (el.dataset.gion !== undefined) { S.insts[Number(el.dataset.gion)].on = el.checked; return out(box); }
+        if (el.dataset.gigrp) { const [i, k] = el.dataset.gigrp.split('|'); S.insts[Number(i)].ov[k] = Number(el.value); return out(box); }
+        if (el.dataset.giterm !== undefined) { S.term = Number(el.value); return; }
         if (el.dataset.gimap) { S.map[el.dataset.gimap] = Number(el.value); return; }
         if (el.dataset.gialso) { S.also[el.dataset.gialso] = el.checked; return; }
         if (el.dataset.giwr !== undefined) { S.rows[Number(el.dataset.giwr)].writing = el.checked; return; }
@@ -3655,8 +3786,19 @@ function importGrelhaDialog(c, then = null) {
       const tgt = Object.values(S.map).filter(i => i >= 0); if (new Set(tgt).size !== tgt.length) return mErr('Dois domínios antigos estão ligados ao mesmo domínio novo. Escolha correspondências diferentes (ou «manter com peso 0%»).');
       const done = [];
       applyGrelha(c, S.rows, S.map, S.useCuts ? S.cuts : null); done.push(c.name);
+      let nMom = 0; const today = new Date().toISOString().slice(0, 10);
+      S.insts.filter(x => x.on).forEach((x, k) => {
+        const qs = [];
+        for (const g of giInstPlan(x, S.rows)) { const e = eff(x, g); if (e < 0) continue; const d = c.domains.find(dd => normalize(dd.name) === normalize(S.rows[e].name)); if (!d) continue; g.items.forEach(it => qs.push({ id: uid(), label: String(it.label), domainId: d.id, max: it.max, rubric: false })); }
+        if (!qs.length) return;
+        const order = c.domains.map(d => d.id); qs.sort((a, b) => order.indexOf(a.domainId) - order.indexOf(b.domainId));
+        const name = String(x.name || x.sheet).trim() || 'Teste importado';
+        c.moments.push({ id: uid(), name: c.moments.some(m => normalize(m.name) === normalize(name)) ? name + ' (importado)' : name, short: '', term: Math.min(S.term, terms(c).length - 1), date: today, weight: 1, mode: 'perguntas', numbering: 'dominio', questions: qs, domainIds: [], scale: ptsScale(c), scores: {}, rubrics: {}, absent: {}, created: Date.now() + k, ...(isProf(c) ? { moduleId: '' } : {}) });
+        nMom++;
+      });
+      if (nMom) done.push(`${nMom} teste(s) ou trabalho(s) criados`);
       for (const id of Object.keys(S.also).filter(k => S.also[k])) { const x = APP.state.classes.find(k => k.id === id); if (x) { applyGrelha(x, S.rows, null, S.useCuts ? S.cuts : null); done.push(x.name); } }
-      changed(); render(); toast(`Grelha aplicada: ${done.join(', ')}.`, 4500); after();
+      changed(); if (nMom && !then) view.tab = 'momentos'; render(); toast(`Grelha aplicada: ${done.join(' · ')}.`, 5000); after();
     } }] });
 }
 function applyGrelha(cls, rows, map, cuts) {
