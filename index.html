@@ -385,6 +385,7 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .gigroup.off span{color:var(--graph);text-decoration:line-through}.gigroup i{color:var(--pen2)}
 .sidever{position:sticky;bottom:0;display:block;width:100%;margin-top:-34px;padding:9px 12px;border:0;border-top:1px solid #ffffff22;background:var(--ink);color:#b9d3c9;font:600 12px var(--sans);text-align:left;cursor:pointer}.sidever:hover{color:#fff}
 .side nav{padding-bottom:48px}
+.undobar{display:flex;gap:4px}.undobar .btn:disabled{opacity:.35;cursor:default}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -877,6 +878,7 @@ function shell() {
   <header class="top">
     <button class="brand" data-go="home" aria-label="Início">${LOGO}<span><b>pauta<i>.</i></b><small>avaliação sem complicações</small></span></button>
     <div class="topright">
+      <div class="undobar"><button type="button" class="btn" id="btnUndo" title="Anular a última alteração (Ctrl+Z)" disabled>${ic('undo')}<span class="lbl">Anular</span></button><button type="button" class="btn icon" id="btnRedo" title="Refazer (Ctrl+Y)" aria-label="Refazer" disabled>${ic('redo')}</button></div>
       <div class="status" id="status"><i></i><span><b id="svText"></b><small id="svWhere"></small></span></div>
       <button class="btn primary" id="stAction" hidden></button>
       <button class="btn" id="btnSync" title="Sincroniza com a pen e atualiza o ecrã">${ic('sync')}<span class="lbl">Atualizar</span></button>
@@ -1461,6 +1463,7 @@ function helpHTML() {
     <li><b>Excel</b>: cada momento tem o seu Excel (perguntas, domínios, % e valores). A pauta do período também.</li>
     <li><b>Pauta do período</b>: mostra, por domínio, a nota de cada momento, a média e o valor ponderado pelo peso; depois a proposta em 20 e em % (e o nível). À direita regista a <b>autoavaliação</b>, a <b>classificação final</b> que decide (pode ser diferente da proposta) e <b>observações</b>. Imprime em A4 com 30 linhas.</li>
     <li><b>Grelha final · 3.º ciclo</b> (separador da turma): reúne sozinha todos os alunos e avaliações, mostra o resultado de cada domínio, a percentagem global, a proposta de nível (1 a 5) e a evolução de período para período. O professor valida a proposta ou ajusta o nível; cada alteração fica registada. Exporta para Excel e PDF.</li>
+    <li><b>Anular e Refazer</b>: o botão «Anular», no topo, desfaz a última alteração (também com Ctrl+Z). Pode carregar várias vezes seguidas. «Refazer» (Ctrl+Y) volta a pôr o que anulou. Dentro de um campo de texto, o Ctrl+Z desfaz só o que escreveu nesse campo.</li>
     <li><b>Sínteses</b> (separador da turma): escolha as frases de cada aluno em cada período; a PAUTA sugere as do aproveitamento, da evolução e dos domínios a partir das notas. Marque as <b>medidas universais</b> e as estratégias que usou. O texto escreve-se sozinho, pode corrigi-lo à mão e copiá-lo para o Inovar. Imprime e exporta para Excel.</li>
     <li><b>Balanço da turma</b>: os números do período (positivas, média, domínios) e frases pré-feitas para o balanço que entrega nos conselhos de turma.</li>
     <li><b>Grelha da escola</b>: em «Editar turma», «Importar grelha da escola» lê os domínios e as percentagens de um Excel, Word ou PDF. Num Excel, encontra também os testes e trabalhos (as perguntas, as cotações e o domínio de cada pergunta) e cria-os na turma, prontos a corrigir. Confirma tudo antes de aplicar e pode usar a mesma grelha noutras turmas.</li>
@@ -1992,7 +1995,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.3';
+const PAUTA_VERSAO = '3.2.4';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2139,6 +2142,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Anular e Refazer: enganou-se? Carregue em «Anular» (no topo, ao lado do estado da gravação) ou em Ctrl+Z. Pode anular várias vezes seguidas (até 50 passos) e voltar a pôr com «Refazer» (Ctrl+Y).',
   'Agora também para o 2.º ciclo: ao criar a turma (ou em «Editar turma»), escolha «2.º ciclo — níveis 1 a 5». Funciona como o 3.º ciclo e os títulos das grelhas dizem «2.º ciclo».',
   'Novo separador «Sínteses»: síntese descritiva de cada aluno com frases pré-feitas (aproveitamento, evolução, domínios, empenho, comportamento, métodos de trabalho, assiduidade e recomendações). A PAUTA sugere frases a partir das notas e o texto pode ser corrigido à mão, copiado para o Inovar, impresso ou exportado para Excel.',
   'Medidas universais (DL 54/2018) nas sínteses: diferenciação pedagógica, acomodações curriculares, enriquecimento curricular, promoção do comportamento pró-social e intervenção em pequenos grupos, cada uma com as estratégias que usou. Pode aplicar as mesmas medidas a vários alunos de uma vez.',
@@ -3836,6 +3840,63 @@ document.addEventListener('click', e => {
   const c = cur(); if (!c || !APP.state) return;
   if (e.target.closest('[data-import-grelha]')) return importGrelhaDialog(c);
   if (e.target.closest('[data-export-grelha]')) return exportGrelha(c).catch(err => toast('Não foi possível criar o Excel: ' + err.message));
+});
+
+// =====================================================================================
+// PAUTA — Anular / Refazer (Ctrl+Z / Ctrl+Y).
+// Guarda uma fotografia dos dados antes de cada alteração (as alterações seguidas, como
+// escrever num campo, contam como uma só). Guarda as últimas 50.
+// =====================================================================================
+ICONS.undo = '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>';
+ICONS.redo = '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>';
+const UNDO = { stack: [], redo: [], base: null, owner: null, timer: null };
+function undoEnsureBase() {
+  if (!APP.state || UNDO.owner === APP.state) return;
+  UNDO.owner = APP.state; UNDO.stack = []; UNDO.redo = []; clearTimeout(UNDO.timer); UNDO.timer = null;
+  try { UNDO.base = JSON.stringify(APP.state); } catch (e) { UNDO.base = null; }
+  undoButtons();
+}
+function undoFlush() { if (UNDO.timer) { clearTimeout(UNDO.timer); UNDO.timer = null; try { UNDO.base = JSON.stringify(APP.state); } catch (e) { } } }
+function undoRecord() {
+  undoEnsureBase();
+  if (!UNDO.timer) { if (UNDO.base) { UNDO.stack.push(UNDO.base); if (UNDO.stack.length > 50) UNDO.stack.shift(); } UNDO.redo = []; }
+  else clearTimeout(UNDO.timer);
+  UNDO.timer = setTimeout(() => { UNDO.timer = null; try { UNDO.base = JSON.stringify(APP.state); } catch (e) { } }, 700);
+  undoButtons();
+}
+function undoButtons() {
+  const u = $('#btnUndo'), r = $('#btnRedo'); if (!u || !r) return;
+  u.disabled = !UNDO.stack.length; r.disabled = !UNDO.redo.length;
+}
+function undoRestore(json, msg) {
+  const st = JSON.parse(json); APP.state = st; UNDO.owner = st; UNDO.base = json;
+  _undoChanged(); render(); undoButtons(); toast(msg);
+}
+function undoDo() {
+  if (!APP.state) return;
+  if ($('#modal')?.classList.contains('open')) return toast('Feche primeiro a janela que está aberta.');
+  undoFlush(); undoEnsureBase();
+  if (!UNDO.stack.length) return toast('Não há nada para anular.');
+  UNDO.redo.push(UNDO.base); undoRestore(UNDO.stack.pop(), 'Anulado. Para voltar a pôr, use «Refazer» (Ctrl+Y).');
+}
+function redoDo() {
+  if (!APP.state) return;
+  undoFlush(); undoEnsureBase();
+  if (!UNDO.redo.length) return toast('Não há nada para refazer.');
+  UNDO.stack.push(UNDO.base); undoRestore(UNDO.redo.pop(), 'Refeito.');
+}
+const _undoChanged = changed;
+changed = function () { undoRecord(); return _undoChanged.apply(this, arguments); };
+const _undoRender = render;
+render = function () { undoEnsureBase(); const r = _undoRender.apply(this, arguments); undoButtons(); return r; };
+document.addEventListener('click', e => { if (e.target.closest('#btnUndo')) undoDo(); else if (e.target.closest('#btnRedo')) redoDo(); });
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
+  const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;   // nos campos de texto, o Ctrl+Z normal continua a funcionar
+  if (!APP.state) return;
+  e.preventDefault();
+  if (k === 'y' || (k === 'z' && e.shiftKey)) redoDo(); else undoDo();
 });
 
 boot();
