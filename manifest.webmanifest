@@ -1,16 +1,75 @@
 {
+  "id": "./",
   "name": "PAUTA · avaliação sem complicações",
   "short_name": "PAUTA",
-  "description": "Correção de testes e classificações. Os dados ficam cifrados no seu computador e na sua pen.",
+  "description": "Corrija testes pergunta a pergunta, calcule médias por domínio e prepare a pauta de cada período, com gráficos e balanço da turma. Para professores do 2.º e 3.º ciclos e do secundário. Os dados ficam cifrados no seu computador e na sua pen.",
   "lang": "pt-PT",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f3f5f4",
   "theme_color": "#0b4d3e",
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
+  "prefer_related_applications": false,
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "loja/captura-1.png",
+      "sizes": "2049x1152",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Início da PAUTA"
+    },
+    {
+      "src": "loja/captura-2.png",
+      "sizes": "2049x1152",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Momentos de avaliação de uma turma"
+    },
+    {
+      "src": "loja/captura-3.png",
+      "sizes": "2049x1152",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Correção de um teste pergunta a pergunta"
+    },
+    {
+      "src": "loja/captura-4.png",
+      "sizes": "2049x1152",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Pauta do período com gráfico"
+    },
+    {
+      "src": "loja/captura-5.png",
+      "sizes": "2049x1152",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Balanço da turma escrito automaticamente"
+    }
   ]
 }
