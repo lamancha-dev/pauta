@@ -386,6 +386,10 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .sidever{position:sticky;bottom:0;display:block;width:100%;margin-top:-34px;padding:9px 12px;border:0;border-top:1px solid #ffffff22;background:var(--ink);color:#b9d3c9;font:600 12px var(--sans);text-align:left;cursor:pointer}.sidever:hover{color:#fff}
 .side nav{padding-bottom:48px}
 .undobar{display:flex;gap:4px}.undobar .btn:disabled{opacity:.35;cursor:default}
+.gimerge{display:flex;gap:10px;align-items:flex-start;margin:4px 0 10px;padding:10px 14px;border-radius:10px;background:var(--pen3);color:var(--ink);font-size:13.5px;max-width:720px}.gimerge .ic{flex:none;color:var(--pen2);margin-top:2px}
+.qmv{height:32px;max-width:220px;border:1px solid #cfdad5;border-radius:8px;padding:0 6px;font-size:12.5px;color:var(--ink2);background:#fff}
+.grade thead tr:nth-child(3) th{top:62px}.grade thead tr.subrow th{font-style:italic;font-weight:600;font-size:12px;background:#f7faf8;color:var(--ink2)}.grade thead tr.subrow th.dt{font-style:normal}.pt th.sub{font-style:italic;font-weight:600}
+.grade th.st,.grade td.st{background:#fbf6ef}.grade td.st b{display:block;color:var(--pen2)}.grade td.st small{display:block;font-size:11px;color:var(--graph)}.grade td.st.partial{background:#fdf1e6}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -468,6 +472,14 @@ function renumber(c) { activeStudents(c).forEach((s, i) => { if (!s.n) s.n = i +
 const momentDomainIds = (c, m) => (m.mode === 'perguntas'
   ? [...new Set(m.questions.map(q => q.domainId))]
   : m.domainIds.slice()).filter(id => c.domains.some(d => d.id === id));
+// Conteúdos (subdomínios) opcionais: cada pergunta pode ter um conteúdo (ex.: Educação Literária), qualquer que seja o domínio.
+const conteudosOf = c => (c.conteudos || []).map(x => String(x).trim()).filter(Boolean);
+const momentHasSub = m => m.mode === 'perguntas' && (m.questions || []).some(q => q.sub);
+function subGroups(qs, width = () => 1) { const g = []; qs.forEach(q => { const k = q.sub || ''; const last = g[g.length - 1]; if (last && last.sub === k) { last.n += width(q); last.qs.push(q); } else g.push({ sub: k, n: width(q), qs: [q] }); }); return g; }
+// Nota de cada conteúdo dentro de um domínio (só quando o domínio tem 2 ou mais conteúdos neste teste).
+const subCols = (m, did) => { if (!momentHasSub(m)) return null; const g = subGroups(domainQuestions(m, did)); return g.length > 1 ? g : null; };
+function subJoin(m, did, arr, mk) { const g = subCols(m, did); if (!g) return arr.join(''); let out = '', k = 0; g.forEach((grp, gi) => { out += arr.slice(k, k + grp.qs.length).join('') + mk(grp, gi); k += grp.qs.length; }); return out; }
+function subPoints(m, sid, qs) { if (isAbsent(m, sid)) return null; const q2 = qs.filter(q => !isNA(m, sid, q.id)); if (!q2.length) return null; const v = q2.map(q => scoreOf(m, sid, q.id)); if (v.every(x => x === null)) return null; return { pts: sum(v.filter(x => x !== null)), max: sum(q2.map(q => Number(q.max) || 0)), complete: v.every(x => x !== null) }; }
 const domainQuestions = (m, did) => m.mode === 'perguntas' ? m.questions.filter(q => q.domainId === did) : [];
 function domainMaxIn(m, did) { return m.mode === 'perguntas' ? sum(domainQuestions(m, did).map(q => Number(q.max) || 0)) : (Number(m.scale) || 200); }
 const scoreOf = (m, sid, key) => { const v = m.scores?.[sid]?.[key]; return isNum(v) ? Number(v) : null; };
@@ -1084,6 +1096,8 @@ function momentForm(c, existing = null) {
         <button type="button" class="btn xs" data-split="${d.id}" title="Dividir ${S} pontos igualmente">Dividir ${S}</button><button type="button" class="btn xs" data-addq="${d.id}">${ic('plus')}Pergunta</button></div>
         ${qs.length ? '<div class="qrow qhead"><span class="ql">Pergunta</span><span class="qm">Cotação</span></div>' : ''}${qs.map(q => `<div class="qrow"><input class="ql" data-ql="${q.id}" value="${esc(q.label)}" aria-label="Pergunta" placeholder="N.º">
           <input class="qm" data-qm="${q.id}" value="${esc(q.max)}" inputmode="decimal" aria-label="Cotação"><span class="unit">pontos</span>
+          ${(conteudosOf(c).length || m.questions.some(x => x.sub)) ? `<select class="qmv qsub" data-qsub="${q.id}" title="Conteúdo desta pergunta" aria-label="Conteúdo desta pergunta"><option value="">Conteúdo: —</option>${[...new Set([...conteudosOf(c), ...m.questions.map(x => x.sub).filter(Boolean)])].map(x => `<option value="${esc(x)}" ${x === q.sub ? 'selected' : ''}>Conteúdo: ${esc(x)}</option>`).join('')}</select>` : ''}
+          ${c.domains.length > 1 ? `<select class="qmv" data-qmv="${q.id}" title="Mudar esta pergunta para outro domínio (as notas já lançadas mantêm-se)" aria-label="Domínio desta pergunta">${c.domains.map(x => `<option value="${x.id}" ${x.id === q.domainId ? 'selected' : ''}>Conta para: ${esc(x.name)}</option>`).join('')}</select>` : ''}
           ${writingOK(d) ? `<label class="rubchk"><input type="checkbox" data-qr="${q.id}" ${q.rubric ? 'checked' : ''}>Texto corrigido com a rubrica de exame</label>` : ''}
           <button type="button" class="btn xs icon" data-delq="${q.id}" aria-label="Apagar pergunta">${ic('x')}</button></div>`).join('')}
         </div>`;
@@ -1111,7 +1125,7 @@ function momentForm(c, existing = null) {
       box.addEventListener('click', e => {
         const mode = e.target.closest('[data-mode]'); if (mode && !hasScores) { const prev = m.mode; m.mode = mode.dataset.mode; if (prev !== m.mode) { if (m.mode === 'dominios') m.domainIds = [...new Set(m.questions.map(q => q.domainId).concat(m._pending || []))]; else { m._pending = m.domainIds.slice(); } } draw(box); return; }
         const nb = e.target.closest('[data-numbering]'); if (nb) { m.numbering = nb.dataset.numbering; autoLabels(); draw(box); return; }
-        const add = e.target.closest('[data-addq]'); if (add) { m.questions.push({ id: uid(), label: nextLabel(add.dataset.addq), domainId: add.dataset.addq, max: 0, rubric: false }); sortQuestions(); draw(box); box.querySelector(`[data-qm="${m.questions.find(q => q.domainId === add.dataset.addq && q.max === 0)?.id}"]`)?.focus(); return; }
+        const add = e.target.closest('[data-addq]'); if (add) { const prevQ = m.questions.filter(q => q.domainId === add.dataset.addq).pop(); m.questions.push({ id: uid(), label: nextLabel(add.dataset.addq), domainId: add.dataset.addq, max: 0, rubric: false, ...(prevQ?.sub ? { sub: prevQ.sub } : {}) }); sortQuestions(); draw(box); box.querySelector(`[data-qm="${m.questions.find(q => q.domainId === add.dataset.addq && q.max === 0)?.id}"]`)?.focus(); return; }
         const split = e.target.closest('[data-split]'); if (split) { const qs = m.questions.filter(q => q.domainId === split.dataset.split); const each = Math.floor(S / qs.length * 10) / 10; qs.forEach((q, i) => q.max = i === qs.length - 1 ? round(S - each * (qs.length - 1), 1) : each); draw(box); return; }
         const del = e.target.closest('[data-delq]'); if (del) { m.questions = m.questions.filter(q => q.id !== del.dataset.delq); autoLabels(); draw(box); return; }
       });
@@ -1126,6 +1140,8 @@ function momentForm(c, existing = null) {
         }
         if (t.name === 'scale') { m.scale = Number(t.value); return; }
         if (t.dataset.qr) { const q = m.questions.find(x => x.id === t.dataset.qr); q.rubric = t.checked; }
+        if (t.dataset.qsub) { const q = m.questions.find(x => x.id === t.dataset.qsub); if (q) { if (t.value) q.sub = t.value; else delete q.sub; } return; }
+        if (t.dataset.qmv) { const q = m.questions.find(x => x.id === t.dataset.qmv); const d = c.domains.find(x => x.id === t.value); if (!q || !d) return; q.domainId = d.id; if (!writingOK(d)) q.rubric = false; sortQuestions(); draw(box); return; }
       });
       box.addEventListener('input', e => {
         const t = e.target;
@@ -1163,19 +1179,22 @@ function momentHTML() {
   const c = cur(), m = curMoment(); const ids = momentDomainIds(c, m); const students = activeStudents(c);
   const D = id => c.domains.find(d => d.id === id);
   const rubricCell = (sid, key, max) => { const v = scoreOf(m, sid, key); return `<button class="rubbtn ${v !== null ? 'has' : ''}" data-rubric="${sid}|${key}|${max}" title="Corrigir com a rubrica de exame">${v !== null ? fmt(v, 1) : 'Rubrica'}</button>`; };
-  let head1 = '<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Aluno</th>', head2 = '';
+  const hasSub = momentHasSub(m); const RS = hasSub ? 3 : 2; let headS = '';
+  let head1 = `<th rowspan="${RS}" class="n">N.º</th><th rowspan="${RS}" class="nm">Aluno</th>`, head2 = '';
   if (m.mode === 'perguntas') {
-    for (const id of ids) { const qs = domainQuestions(m, id); head1 += `<th colspan="${qs.length + 1}" class="dg">${esc(D(id).name)}</th>`; head2 += qs.map(q => `<th class="q">${esc(q.label)}<small>${fmtMax(q.max)}</small>${q.rubric ? '' : `<button class="fillbtn" data-fill="${q.id}|${q.max}|${esc(D(id).name + ' · ' + q.label)}" title="Dar a mesma pontuação a todos">Preencher</button>`}</th>`).join('') + `<th class="dt">Domínio<small>${isBasic(c) ? '/100 · %' : '/200 · /20'}</small></th>`; }
+    for (const id of ids) { const qs = domainQuestions(m, id); const sc = subCols(m, id); head1 += `<th colspan="${qs.length + 1 + (sc ? sc.length : 0)}" class="dg">${esc(D(id).name)}</th>`;
+      if (hasSub) headS += subGroups(qs).map(g => `<th colspan="${g.n + (sc ? 1 : 0)}" class="sub">${esc(g.sub || '—')}</th>`).join('') + `<th rowspan="2" class="dt">Domínio<small>${isBasic(c) ? '/100 · %' : '/200 · /20'}</small></th>`;
+      head2 += subJoin(m, id, qs.map(q => `<th class="q">${esc(q.label)}<small>${fmtMax(q.max)}</small>${q.rubric ? '' : `<button class="fillbtn" data-fill="${q.id}|${q.max}|${esc(D(id).name + ' · ' + q.label)}" title="Dar a mesma pontuação a todos">Preencher</button>`}</th>`), g => `<th class="st">Nota<small>${esc(g.sub || '—')}</small></th>`) + (hasSub ? '' : `<th class="dt">Domínio<small>${isBasic(c) ? '/100 · %' : '/200 · /20'}</small></th>`); }
   } else {
     for (const id of ids) head1 += `<th rowspan="2" class="dg one">${esc(D(id).name)}<small>0 a ${m.scale || 200}${Number(m.scale) === 20 ? ' valores' : ' pontos'}</small><button class="fillbtn" data-fill="${id}|${m.scale || 200}|${esc(D(id).name)}" title="Dar a mesma nota a todos">Preencher</button></th>`;
   }
-  head1 += `<th rowspan="2" class="res">Resultado<small>% do teste</small></th><th rowspan="2" class="abs">Faltou</th>`;
+  head1 += `<th rowspan="${RS}" class="res">Resultado<small>% do teste</small></th><th rowspan="${RS}" class="abs">Faltou</th>`;
   const modTxt = isProf(c) ? ' · ' + esc(modLabel(c, momentModule(c, m))) : '';
   const rows = students.map(s => {
     const ab = isAbsent(m, s.id); let cells = '';
     if (m.mode === 'perguntas') {
       for (const id of ids) {
-        cells += domainQuestions(m, id).map(q => q.rubric ? `<td class="in">${rubricCell(s.id, q.id, q.max)}</td>` : `<td class="in"><input data-s="${s.id}" data-k="${q.id}" data-max="${q.max}" value="${isNA(m, s.id, q.id) ? 'x' : scoreOf(m, s.id, q.id) ?? ''}" class="${isNA(m, s.id, q.id) ? 'na' : ''}" ${s.medidas ? '' : 'inputmode="decimal"'} ${ab ? 'disabled' : ''} aria-label="${esc(s.name)} pergunta ${esc(q.label)}"></td>`).join('');
+        cells += subJoin(m, id, domainQuestions(m, id).map(q => q.rubric ? `<td class="in">${rubricCell(s.id, q.id, q.max)}</td>` : `<td class="in"><input data-s="${s.id}" data-k="${q.id}" data-max="${q.max}" value="${isNA(m, s.id, q.id) ? 'x' : scoreOf(m, s.id, q.id) ?? ''}" class="${isNA(m, s.id, q.id) ? 'na' : ''}" ${s.medidas ? '' : 'inputmode="decimal"'} ${ab ? 'disabled' : ''} aria-label="${esc(s.name)} pergunta ${esc(q.label)}"></td>`), (g, gi) => `<td class="st" data-st="${s.id}|${id}|${gi}"></td>`);
         cells += `<td class="dt" data-dt="${s.id}|${id}"></td>`;
       }
     } else {
@@ -1191,12 +1210,14 @@ function momentHTML() {
   <section class="chead"><div><h1>${esc(m.name)}</h1><p>${isProf(c) ? modTxt.slice(3) : esc(terms(c)[m.term])}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · ${m.mode === 'perguntas' ? 'correção pergunta a pergunta' : 'nota final de cada domínio'} · <span id="progTxt">${prog.done} de ${prog.total} corrigidos</span></p></div>
     <div class="btnrow"><button class="btn" data-dup-moment="${m.id}">${ic('copy')}Copiar para outras turmas</button><button class="btn" data-print-blank="${m.id}">${ic('print')}Grelha em branco</button><button class="btn" data-excel-moment="${m.id}">${ic('excel')}Excel</button><button class="btn" data-print-cards="${m.id}">${ic('card')}Fichas dos alunos</button><button class="btn" data-results="${m.id}">${ic('grid')}Resultados ${m.mode === 'perguntas' ? 'por pergunta' : 'por domínio'}</button><button class="btn" data-edit-moment="${m.id}">${ic('sliders')}Editar</button></div></section>
   <p class="tiphint">${ic('check')}Ande com <kbd>Enter</kbd> e as setas <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>. Escreva <kbd>+</kbd> para dar a cotação total. «Preencher» dá a mesma pontuação a todos. Caixa vazia = por corrigir, nunca zero.${m.mode === 'perguntas' && students.some(s => s.medidas) ? ' Alunos com medidas (<span class="medb">A</span>): escreva <kbd>x</kbd> numa pergunta que não se aplica; a cotação do domínio ajusta-se.' : ''}</p>
-  ${students.length ? `<div class="tablewrap"><table class="grade" id="gradeTable"><thead><tr>${head1}</tr>${head2 ? `<tr>${head2}</tr>` : ''}</thead><tbody>${rows}</tbody><tfoot id="gradeFoot"></tfoot></table></div>`
+  ${students.length ? `<div class="tablewrap"><table class="grade" id="gradeTable"><thead><tr>${head1}</tr>${headS ? `<tr class="subrow">${headS}</tr>` : ''}${head2 ? `<tr>${head2}</tr>` : ''}</thead><tbody>${rows}</tbody><tfoot id="gradeFoot"></tfoot></table></div>`
     : `<div class="empty sm">${ic('users', 'big')}<h3>A turma ainda não tem alunos</h3><button class="btn primary" data-tab-go="alunos">Adicionar alunos</button></div>`}`;
 }
 function afterMomentRender() { const c = cur(), m = curMoment(); if (!m) return; activeStudents(c).forEach(s => updateRow(c, m, s.id)); updateFoot(c, m); }
 function updateRow(c, m, sid) {
   for (const id of momentDomainIds(c, m)) {
+    (subCols(m, id) || []).forEach((g, gi) => { const el = $(`[data-st="${sid}|${id}|${gi}"]`); if (!el) return; const r = subPoints(m, sid, g.qs); el.classList.toggle('partial', !!(r && !r.complete));
+      el.innerHTML = !r ? '<span class="mut">—</span>' : !r.complete ? `<span class="mut">${fmtMax(r.pts)}/${fmtMax(r.max)}</span>` : isBasic(c) ? `<b>${fmt(r.pts / r.max * 100, 0)}%</b><small>${fmtMax(r.pts)}/${fmtMax(r.max)}</small>` : `<b>${fmt(r.pts / r.max * 20, 1)}</b><small>val. · ${fmtMax(r.pts)}/${fmtMax(r.max)}</small>`; });
     const dt = $(`[data-dt="${sid}|${id}"]`);
     if (dt && domainNA(m, sid, id)) { dt.innerHTML = '<span class="mut">não se aplica</span>'; dt.classList.remove('partial'); }
     else if (dt) { const r = domainPoints(m, sid, id); const S = ptsScale(c); dt.innerHTML = r ? `<b>${fmt(r.pts / r.max * S, 1)}</b><small>${r.complete ? (isBasic(c) ? fmt(r.pts / r.max * 100, 0) + '%' : fmt(r.pts / r.max * 20, 1) + ' val.') : 'incompleto'}</small>` : '<span class="mut">—</span>'; dt.classList.toggle('partial', !!r && !r.complete); }
@@ -1211,7 +1232,7 @@ function updateFoot(c, m) {
   let cells = '<td></td><td class="nm">Média da turma</td>';
   for (const id of momentDomainIds(c, m)) {
     if (m.mode === 'perguntas') {
-      cells += domainQuestions(m, id).map(q => { const a = avg(st.map(s => scoreOf(m, s.id, q.id))); return `<td>${a === null ? '' : fmt(a, 1)}</td>`; }).join('');
+      cells += subJoin(m, id, domainQuestions(m, id).map(q => { const a = avg(st.map(s => scoreOf(m, s.id, q.id))); return `<td>${a === null ? '' : fmt(a, 1)}</td>`; }), g => { const a = avg(st.map(s => { const r = subPoints(m, s.id, g.qs); return r && r.complete && r.max > 0 ? r.pts / r.max * 100 : null; })); return `<td class="st">${a === null ? '' : isBasic(c) ? `<b>${fmt(a, 0)}%</b>` : `<b>${fmt(a / 5, 1)}</b><small>val.</small>`}</td>`; });
       const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td class="dt">${a === null ? '' : isBasic(c) ? `<b>${fmt(a * 5, 1)}</b><small>${fmt(a * 5, 0)}%</small>` : `<b>${fmt(a * 10, 1)}</b><small>${fmt(a, 1)} val.</small>`}</td>`;
     } else { const a = avg(st.map(s => domainGrade(m, s.id, id))); cells += `<td>${a === null ? '' : isBasic(c) ? fmt(a * 5, 1) + '%' : fmt(a, 1) + ' val.'}</td>`; }
   }
@@ -1421,6 +1442,8 @@ function configHTML(c) {
       ${isPortuguese(c) ? `<label class="rubchk"><input type="checkbox" data-dwriting="${d.id}" ${d.writing ? 'checked' : ''}>Escrita (rubrica)</label>` : ''}<button class="btn xs icon" data-del-domain="${d.id}" aria-label="Apagar domínio">${ic('trash')}</button></div>`).join('')}</div>
     <div class="btnrow left"><button class="btn sm" data-add-domain>${ic('plus')}Acrescentar domínio</button><button class="btn sm primary" data-import-grelha title="Lê os domínios e as ponderações de um ficheiro Excel, Word ou PDF da escola">${ic('upload')}Importar grelha da escola</button><button class="btn sm" data-export-grelha title="Guarda estes domínios e pesos num Excel, para partilhar com colegas">${ic('excel')}Exportar esta grelha</button></div>
     <p class="hint">A escola tem critérios próprios? Use <b>Importar grelha da escola</b>: a PAUTA lê o ficheiro (Excel, Word ou PDF), mostra os domínios e as percentagens que encontrou e só aplica depois de confirmar. As notas já lançadas não se perdem.</p></section>
+  <section><h2>Conteúdos <small style="font-weight:500;color:var(--graph)">(opcional)</small></h2><p class="hint">Só para escolas em que os domínios são gerais (por exemplo Conhecimento, Comunicação…) e os conteúdos da disciplina entram dentro deles. Escreva os conteúdos separados por vírgulas, por exemplo: <i>Educação Literária, Gramática, Leitura, Escrita, Oralidade</i>. Em cada teste, cada pergunta passa a ter o seu domínio e o seu conteúdo, e o mesmo conteúdo pode contar para domínios diferentes. Se deixar em branco, nada muda.</p>
+    <div class="f"><input data-conteudos value="${esc(conteudosOf(c).join(', '))}" placeholder="Educação Literária, Gramática, Leitura, Escrita, Oralidade"></div></section>
   ${isPortuguese(c) ? `<section><h2>Escrita — critérios de exame</h2><div class="fgrid">
     <label class="f wide">Modelo<select data-cfg="writingModel"><option value="exame639" ${R.id === 'exame639' ? 'selected' : ''}>Exame Nacional 639 (secundário) — A, B, C + correção linguística · 44 pontos</option><option value="prova91" ${R.id === 'prova91' ? 'selected' : ''}>Prova Final 91 (9.º ano) — A, B, C, D, E · 20 pontos</option></select></label>
     <label class="f">Mínimo de palavras<input data-wlim="0" value="${lim[0]}" inputmode="numeric"></label><label class="f">Máximo de palavras<input data-wlim="1" value="${lim[1]}" inputmode="numeric"></label></div>
@@ -1506,25 +1529,27 @@ const padRows = (list, min = MIN_ROWS) => { const out = list.slice(); while (out
 function printBlank(c, m) {
   const ids = momentDomainIds(c, m); const D = id => c.domains.find(d => d.id === id);
   const st = padRows(activeStudents(c));
-  let h1 = '<th rowspan="2" class="n">N.º</th><th rowspan="2" class="nm">Nome</th>', h2 = '';
+  const hasSub = momentHasSub(m); const RS = hasSub ? 3 : 2; let hS = '';
+  let h1 = `<th rowspan="${RS}" class="n">N.º</th><th rowspan="${RS}" class="nm">Nome</th>`, h2 = '';
   let ncols = 0;
   if (m.mode === 'perguntas') {
     const R = rubricFor(c); const rubCols = [...R.params.map(p => p.key), ...R.errors.map(e => e.key === 'eA' ? 'Erros A' : e.key === 'eB' ? 'Erros B' : 'Erros')];
     for (const id of ids) {
-      const qs = domainQuestions(m, id); const span = sum(qs.map(q => q.rubric ? rubCols.length + 1 : 1)) + 1; ncols += span;
+      const qs = domainQuestions(m, id); const sc = subCols(m, id); const span = sum(qs.map(q => q.rubric ? rubCols.length + 1 : 1)) + 1 + (sc ? sc.length : 0); ncols += span;
       h1 += `<th colspan="${span}">${esc(D(id).name)}</th>`;
-      h2 += qs.map(q => q.rubric ? rubCols.map(k => `<th class="rub">${esc(q.label)}·${k}</th>`).join('') + `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>` : `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>`).join('') + `<th class="tot">Total<small>${fmtMax(domainMaxIn(m, id))}</small></th>`;
+      if (hasSub) hS += subGroups(qs, q => q.rubric ? rubCols.length + 1 : 1).map(g => `<th colspan="${g.n + (sc ? 1 : 0)}" class="sub">${esc(g.sub || '—')}</th>`).join('') + `<th rowspan="2" class="tot">Total<small>${fmtMax(domainMaxIn(m, id))}</small></th>`;
+      h2 += subJoin(m, id, qs.map(q => q.rubric ? rubCols.map(k => `<th class="rub">${esc(q.label)}·${k}</th>`).join('') + `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>` : `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>`), g => `<th class="tot">Nota<small>${fmtMax(sum(g.qs.map(q => Number(q.max) || 0)))}</small></th>`) + (hasSub ? '' : `<th class="tot">Total<small>${fmtMax(domainMaxIn(m, id))}</small></th>`);
     }
   } else { for (const id of ids) { ncols++; h1 += `<th rowspan="2">${esc(D(id).name)}<small>0–${m.scale || 200}</small></th>`; } }
-  h1 += '<th rowspan="2" class="tot">%</th>';
+  h1 += `<th rowspan="${RS}" class="tot">%</th>`;
   const nRub = rubricFor(c).params.length + rubricFor(c).errors.length;
-  const blankCells = m.mode === 'perguntas' ? ids.map(id => domainQuestions(m, id).map(q => q.rubric ? '<td class="rub"></td>'.repeat(nRub) + '<td></td>' : '<td></td>').join('') + '<td class="tot"></td>').join('') : ids.map(() => '<td></td>').join('');
+  const blankCells = m.mode === 'perguntas' ? ids.map(id => subJoin(m, id, domainQuestions(m, id).map(q => q.rubric ? '<td class="rub"></td>'.repeat(nRub) + '<td></td>' : '<td></td>'), () => '<td class="tot"></td>') + '<td class="tot"></td>').join('') : ids.map(() => '<td></td>').join('');
   const rows = st.map((s, i) => `<tr><td class="n">${s ? (s.n || '') : ''}</td><td class="nm">${s ? esc(s.name) : ''}</td>${blankCells}<td class="tot"></td></tr>`).join('');
   const fs = ncols > 26 ? 7 : ncols > 18 ? 8 : 9;
   const writing = m.mode === 'perguntas' && m.questions.some(q => q.rubric);
   const R = rubricFor(c);
   printDoc(`<div class="pdoc" style="--fs:${fs}pt">${docHeader(c, 'Grelha de correção — ' + m.name, momentWhen(c, m) + (m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''))}
-    <table class="pt blank"><thead><tr>${h1}</tr>${h2 ? `<tr>${h2}</tr>` : ''}</thead><tbody>${rows}</tbody></table>
+    <table class="pt blank"><thead><tr>${h1}</tr>${hS ? `<tr>${hS}</tr>` : ''}${h2 ? `<tr>${h2}</tr>` : ''}</thead><tbody>${rows}</tbody></table>
     <footer class="pf"><span>${isBasic(c) ? 'Cada domínio é cotado até 100 pontos (resultado em %).' : 'Cada domínio é convertido para 200 pontos (20 valores).'} % do teste = média dos domínios avaliados.${licenseLine() ? ' <b>' + esc(licenseLine()) + '.</b>' : ''}${writing ? ` Escrita: ${esc(R.name)} — ${R.params.map(p => p.key + ' ' + p.name).join(' · ')} · ${R.errors.map(e => e.name).join(' · ')} (máx. ${R.max}).` : ''}</span>${pautaMark()}</footer></div>`, { landscape: ncols > 8, title: 'Grelha ' + m.name });
 }
 
@@ -1584,14 +1609,17 @@ async function excelMoment(c, m) {
   const t = APP.state.teacher;
   const rows = [[`${m.name} — ${c.subject} — Turma ${c.name}`], [`${t.school || ''}${t.school ? ' · ' : ''}${momentWhen(c, m)}${m.date ? ' · ' + new Date(m.date + 'T12:00').toLocaleDateString('pt-PT') : ''} · Ano letivo ${c.year}`], []];
   const head = ['N.º', 'Nome'];
-  if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) head.push(`${D(id).name} · ${q.label} (${fmtMax(q.max)})`);
+  if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) head.push(`${D(id).name} · ${q.sub ? q.sub + ' · ' : ''}${q.label} (${fmtMax(q.max)})`);
   const B = isBasic(c), S = ptsScale(c);
+  const subList = m.mode === 'perguntas' ? ids.flatMap(id => (subCols(m, id) || []).map(g => ({ id, g }))) : [];
+  subList.forEach(x => head.push(`${D(x.id).name} · ${x.g.sub || '—'} (${B ? '%' : '/20'})`));
   for (const id of ids) head.push(`${D(id).name} (/${S})`, B ? `${D(id).name} (%)` : `${D(id).name} (/20)`);
   head.push('Teste (%)', ...(B ? [] : ['Teste (/20)']), 'Observação');
   rows.push(head);
   for (const s of activeStudents(c)) {
     const r = [s.n || '', s.name];
     if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) r.push(isNA(m, s.id, q.id) ? 'n/a' : n1(scoreOf(m, s.id, q.id)));
+    subList.forEach(x => { const p = subPoints(m, s.id, x.g.qs); r.push(p && p.complete && p.max > 0 ? n1(B ? p.pts / p.max * 100 : p.pts / p.max * 20) : ''); });
     for (const id of ids) { const g = domainGrade(m, s.id, id); r.push(g === null ? '' : n1(g * S / 20), g === null ? '' : n1(B ? g * 5 : g)); }
     const p = momentPercent(c, m, s.id); r.push(p === null ? '' : round(p, 1), ...(B ? [] : [p === null ? '' : round(p / 5, 1)]), isAbsent(m, s.id) ? 'Faltou' : p === null ? 'Por corrigir' : '');
     rows.push(r);
@@ -1599,6 +1627,7 @@ async function excelMoment(c, m) {
   const st = activeStudents(c).filter(s => !isAbsent(m, s.id)); const avg = f => { const v = st.map(f).filter(x => x !== null); return v.length ? round(sum(v) / v.length, 2) : ''; };
   const foot = ['', 'Média da turma'];
   if (m.mode === 'perguntas') for (const id of ids) for (const q of domainQuestions(m, id)) foot.push(avg(s => scoreOf(m, s.id, q.id)));
+  subList.forEach(x => foot.push(avg(s => { const p = subPoints(m, s.id, x.g.qs); return p && p.complete && p.max > 0 ? (B ? p.pts / p.max * 100 : p.pts / p.max * 20) : null; })));
   for (const id of ids) foot.push(avg(s => { const g = domainGrade(m, s.id, id); return g === null ? null : g * S / 20; }), avg(s => { const g = domainGrade(m, s.id, id); return g === null ? null : B ? g * 5 : g; }));
   foot.push(avg(s => momentPercent(c, m, s.id)), ...(B ? [] : [avg(s => { const p = momentPercent(c, m, s.id); return p === null ? null : p / 5; })]));
   rows.push([], foot, [], [B ? 'Cada domínio é avaliado em 100 pontos (resultado em %). O resultado do teste em % é a média dos domínios avaliados.' : 'Cada domínio é avaliado em 200 pontos (20 valores). O resultado do teste em % é a média dos domínios avaliados.']);
@@ -1994,46 +2023,8 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png'], ['icon', 'icon-192.png']]) { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
-// ---------------------------------------------------------------- botão «Instalar a PAUTA» (bem visível, só no navegador)
-let pedidoInstalar = null;
-const jaInstalada = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
-function botaoInstalar() {
-  if (!/^https?:$/.test(location.protocol) || LOCAL || jaInstalada() || $('#instalarPauta')) return;
-  const st = document.createElement('style');
-  st.textContent = `#instalarPauta{position:fixed;right:22px;bottom:22px;z-index:420;display:flex;align-items:center;gap:12px;padding:14px 22px 14px 16px;border:0;border-radius:14px;background:var(--pen);color:#fff;font:700 16px var(--sans);box-shadow:0 12px 34px #0006;cursor:pointer;animation:instPulse 2.4s ease-in-out 3}
-#instalarPauta:hover{background:var(--pen2)}#instalarPauta .instIc{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#fff3;font-size:20px;line-height:1}
-#instalarPauta small{display:block;font:500 12.5px var(--sans);opacity:.92;margin-top:2px}
-@keyframes instPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-@media (max-width:600px){#instalarPauta{left:12px;right:12px;bottom:12px;justify-content:center}}
-@media print{#instalarPauta{display:none}}`;
-  document.head.appendChild(st);
-  const b = document.createElement('button'); b.id = 'instalarPauta'; b.type = 'button';
-  b.innerHTML = `<span class="instIc">⬇</span><span>Instalar a PAUTA no computador<small>Fica no ambiente de trabalho e atualiza-se sozinha</small></span>`;
-  b.onclick = () => {
-    const edge = /Edg\//.test(navigator.userAgent), chrome = /Chrome\//.test(navigator.userAgent) && !edge;
-    const safari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg/.test(navigator.userAgent);
-    const passos = edge ? `<li>Carregue nos <b>três pontinhos «…»</b>, no canto de cima à direita do Edge.</li><li>Escolha <b>«Aplicações»</b> e depois <b>«Instalar este site como aplicação»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
-      : chrome ? `<li>Na barra de endereço, do lado direito, carregue no ícone de instalar (um <b>ecrã com uma seta</b>).</li><li>Se não o vir: carregue nos <b>três pontinhos ⋮</b>, no canto de cima à direita do Chrome, e escolha <b>«Transmitir, guardar e partilhar» › «Instalar página como app»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
-      : safari ? `<li>No menu <b>«Ficheiro»</b>, escolha <b>«Adicionar à Dock»</b>.</li><li>Carregue em <b>«Adicionar»</b>.</li>`
-      : `<li>Este navegador não instala a PAUTA. Copie o endereço que está lá em cima e abra-o no <b>Google Chrome</b> ou no <b>Microsoft Edge</b>.</li><li>Depois carregue outra vez neste botão laranja.</li>`;
-    const nota = `<p style="margin:14px 0 0;padding:10px 12px;border-radius:9px;background:var(--mark2);font-size:14px">Não é descarregado nenhum ficheiro. No fim, aparece um <b>ícone da PAUTA</b> no ambiente de trabalho e no menu Iniciar. Se o menu do navegador disser <b>«Abrir na PAUTA»</b>, é porque já está instalada.</p>`;
-    const tem = !!pedidoInstalar;
-    modal({ title: 'Instalar a PAUTA no computador',
-      intro: tem ? 'Carregue em «Instalar agora». Vai aparecer uma janelinha do navegador: carregue em «Instalar».' : 'Siga estes passos:',
-      body: (tem ? `<p style="margin:0 0 8px;font-weight:600">Se não aparecer a janelinha, faça assim:</p>` : '') + `<ol style="margin:0;padding-left:1.3em;line-height:1.7">${passos}</ol>` + nota,
-      actions: tem ? [{ label: 'Fechar' }, { label: 'Instalar agora', kind: 'primary', keepOpen: true, run: async () => {
-        const ev = pedidoInstalar; pedidoInstalar = null;
-        try { await ev.prompt(); const r = await ev.userChoice; if (r.outcome === 'accepted') { b.remove(); closeModal(); return; } return mErr('A instalação foi cancelada. Pode tentar pelos passos acima.'); }
-        catch (e) { return mErr('O navegador não abriu a janela de instalação. Siga os passos acima.'); }
-      } }] : [{ label: 'Percebi', kind: 'primary' }] });
-  };
-  document.body.appendChild(b);
-}
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedidoInstalar = e; botaoInstalar(); });
-window.addEventListener('appinstalled', () => { $('#instalarPauta')?.remove(); pedidoInstalar = null; toast('A PAUTA ficou instalada. Já a pode abrir pelo ícone no ambiente de trabalho.', 5000); });
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', botaoInstalar); else botaoInstalar();
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.6';
+const PAUTA_VERSAO = '3.2.8';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2180,7 +2171,10 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
-  'Botão «Instalar a PAUTA no computador», bem visível no canto do ecrã: com um clique, a PAUTA fica no ambiente de trabalho e passa a atualizar-se sozinha.',
+  'Quando um domínio tem dois ou mais conteúdos no mesmo teste (ex.: Educação Literária e Gramática em Conhecimento), a grelha de correção mostra a nota de cada conteúdo e, a seguir, a nota do domínio. Também na grelha em branco e no Excel do teste.',
+  'Conteúdos (opcional), para escolas com domínios gerais: em «Editar turma» escreva os conteúdos (ex.: Educação Literária, Gramática, Oralidade). Em cada teste, cada pergunta tem o seu domínio e o seu conteúdo, e a grelha de correção mostra Domínio › Conteúdo › Pergunta. O mesmo conteúdo pode contar para domínios diferentes.',
+  'Ao editar um teste, cada pergunta tem a opção «Conta para:», para escolher o domínio a que pertence. Útil quando o mesmo conteúdo (por exemplo, a Educação Literária) conta para domínios diferentes consoante a pergunta. As notas já lançadas mantêm-se.',
+  'Importar grelha: agora pode juntar vários domínios antigos num só domínio novo (por exemplo, Leitura e Oralidade em Comunicação). As notas já lançadas não se perdem.',
   'Anular e Refazer: enganou-se? Carregue em «Anular» (no topo, ao lado do estado da gravação) ou em Ctrl+Z. Pode anular várias vezes seguidas (até 50 passos) e voltar a pôr com «Refazer» (Ctrl+Y).',
   'Agora também para o 2.º ciclo: ao criar a turma (ou em «Editar turma»), escolha «2.º ciclo — níveis 1 a 5». Funciona como o 3.º ciclo e os títulos das grelhas dizem «2.º ciclo».',
   'Novo separador «Sínteses»: síntese descritiva de cada aluno com frases pré-feitas (aproveitamento, evolução, domínios, empenho, comportamento, métodos de trabalho, assiduidade e recomendações). A PAUTA sugere frases a partir das notas e o texto pode ser corrigido à mão, copiado para o Inovar, impresso ou exportado para Excel.',
@@ -3467,6 +3461,9 @@ document.addEventListener('keydown', e => { const el = e.target; if (el.matches?
 // número da versão (barra lateral e Ajuda): abre a lista de novidades
 document.addEventListener('click', e => { if (!e.target.closest('[data-versao]')) return; modal({ title: `Novidades da PAUTA ${PAUTA_VERSAO}`, body: `<ul style="margin:0;padding-left:1.2em;line-height:1.6">${NOVIDADES.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`, actions: [{ label: 'Fechar', kind: 'primary' }] }); });
 
+// lista de conteúdos da turma (Editar turma)
+document.addEventListener('change', e => { const el = e.target; if (el.dataset?.conteudos === undefined) return; const c = cur(); if (!c) return; c.conteudos = [...new Set(el.value.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean))]; changed(); toast(c.conteudos.length ? `Conteúdos guardados: ${c.conteudos.join(', ')}.` : 'Conteúdos apagados.'); });
+
 // =====================================================================================
 // PAUTA 3.2 — importar a grelha de critérios da escola (domínios e pesos).
 // Lê Excel (.xlsx, .xls, .ods, .csv), Word (.docx), PDF com texto ou texto colado.
@@ -3779,6 +3776,11 @@ function importGrelhaDialog(c, then = null) {
   const guess = d => { const n = normalize(d.name); let i = S.rows.findIndex(r => normalize(r.name) === n); if (i >= 0) return i; i = S.rows.findIndex(r => { const m = normalize(r.name); return m && (m.includes(n) || n.includes(m) || m.split(' ')[0] === n.split(' ')[0]); }); return i; };
   const setPick = i => { S.pick = i; S.rows = (S.cands[i]?.rows || []).map(r => ({ ...r, writing: isWritingName(r.name) })); S.map = {}; used.forEach(d => { const g = guess(d); S.map[d.id] = g >= 0 ? g : -1; }); };
   const tot = () => round(sum(S.rows.map(r => Number(r.w) || 0)), 2);
+  const giMergeNote = () => {
+    const by = {}; used.forEach(d => { const i = S.map[d.id]; if (i >= 0) (by[i] ||= []).push(d.name); });
+    const j = Object.entries(by).filter(([, a]) => a.length > 1);
+    return j.length ? `<p class="gimerge">${ic('help')}<span>${j.map(([i, a]) => `<b>${a.map(esc).join(' + ')}</b> vão ficar juntos em <b>${esc(S.rows[i]?.name || '')}</b>`).join('; ')}. As notas não se perdem: nos testes corrigidos pergunta a pergunta, as perguntas passam a contar para o domínio novo; nos registos com uma nota por domínio, fica a média das notas antigas.</span></p>` : '';
+  };
   const out = box => {
     const o = box.querySelector('#giOut'); if (!S.cands.length) { o.innerHTML = ''; return; }
     const t = tot(); const others = APP.state.classes.filter(x => x.id !== c.id);
@@ -3790,7 +3792,8 @@ function importGrelhaDialog(c, then = null) {
       <button type="button" class="btn sm" data-giadd>${ic('plus')}Acrescentar domínio</button>
       ${S.cuts ? `<label class="copyrow" style="margin-top:12px"><input type="checkbox" data-gicuts ${S.useCuts ? 'checked' : ''}><span><b>Níveis (2.º e 3.º ciclos) encontrados na grelha</b><small>Nível 2 ≥ ${S.cuts[0]}% · 3 ≥ ${S.cuts[1]}% · 4 ≥ ${S.cuts[2]}% · 5 ≥ ${S.cuts[3]}% (aplica-se só às turmas do 2.º e do 3.º ciclo)</small></span></label>` : ''}
       ${instsHTML()}
-      ${used.length ? `<h3 class="gih">Notas já lançadas</h3><p class="hint">Estes domínios da turma já têm notas. Diga a que domínio novo correspondem, para não perder nada.</p>
+      ${used.length ? `<h3 class="gih">Notas já lançadas</h3><p class="hint">Estes domínios da turma já têm notas. Diga a que domínio novo correspondem, para não perder nada. Pode juntar vários domínios antigos no mesmo domínio novo.</p>
+        ${giMergeNote()}
         <div class="gimap">${used.map(d => `<div class="gimrow"><span><b>${esc(d.name)}</b></span><span>→</span><select data-gimap="${d.id}">${S.rows.map((r, i) => `<option value="${i}" ${S.map[d.id] === i ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="-1" ${S.map[d.id] === -1 ? 'selected' : ''}>Não corresponde: manter com peso 0%</option></select></div>`).join('')}</div>` : ''}
       ${others.length ? `<h3 class="gih">Usar a mesma grelha noutras turmas</h3><div class="copylist">${others.map(x => `<label class="copyrow"><input type="checkbox" data-gialso="${x.id}" ${S.also[x.id] ? 'checked' : ''}><span><b>${esc(x.name)}</b><small>${esc(x.subject)} · ${esc(levelTag(x))}. As notas mantêm-se nos domínios com o mesmo nome.</small></span></label>`).join('')}</div>` : ''}`;
   };
@@ -3828,7 +3831,7 @@ function importGrelhaDialog(c, then = null) {
         if (el.dataset.gion !== undefined) { S.insts[Number(el.dataset.gion)].on = el.checked; return out(box); }
         if (el.dataset.gigrp) { const [i, k] = el.dataset.gigrp.split('|'); S.insts[Number(i)].ov[k] = Number(el.value); return out(box); }
         if (el.dataset.giterm !== undefined) { S.term = Number(el.value); return; }
-        if (el.dataset.gimap) { S.map[el.dataset.gimap] = Number(el.value); return; }
+        if (el.dataset.gimap) { S.map[el.dataset.gimap] = Number(el.value); return out(box); }
         if (el.dataset.gialso) { S.also[el.dataset.gialso] = el.checked; return; }
         if (el.dataset.giwr !== undefined) { S.rows[Number(el.dataset.giwr)].writing = el.checked; return; }
         if (el.dataset.gicuts !== undefined) { S.useCuts = el.checked; return; }
@@ -3838,7 +3841,6 @@ function importGrelhaDialog(c, then = null) {
       if (!S.rows.length) return mErr('Escolha primeiro um ficheiro ou cole o texto da grelha.');
       if (S.rows.some(r => !String(r.name).trim())) return mErr('Há um domínio sem nome.');
       const t = tot(); if (Math.abs(t - 100) > 0.01) return mErr(`Os pesos somam ${fmtMax(t)}%. Têm de somar 100%.`);
-      const tgt = Object.values(S.map).filter(i => i >= 0); if (new Set(tgt).size !== tgt.length) return mErr('Dois domínios antigos estão ligados ao mesmo domínio novo. Escolha correspondências diferentes (ou «manter com peso 0%»).');
       const done = [];
       applyGrelha(c, S.rows, S.map, S.useCuts ? S.cuts : null); done.push(c.name);
       let nMom = 0; const today = new Date().toISOString().slice(0, 10);
@@ -3860,11 +3862,29 @@ function applyGrelha(cls, rows, map, cuts) {
   const used = cls.domains.filter(d => cls.moments.some(m => momentDomainIds(cls, m).includes(d.id)));
   if (!map) { map = {}; const taken = new Set(); for (const d of cls.domains) { const i = rows.findIndex((r, k) => !taken.has(k) && normalize(r.name) === normalize(d.name)); if (i >= 0) { map[d.id] = i; taken.add(i); } } }
   else { map = { ...map }; const taken = new Set(Object.values(map)); for (const d of cls.domains) { if (map[d.id] !== undefined) continue; const i = rows.findIndex((r, k) => !taken.has(k) && normalize(r.name) === normalize(d.name)); if (i >= 0) { map[d.id] = i; taken.add(i); } } }
-  const byNew = {}; for (const [oid, i] of Object.entries(map)) if (i >= 0) byNew[i] = cls.domains.find(d => d.id === oid);
-  const doms = rows.map((r, i) => { const old = byNew[i]; return { id: old ? old.id : uid(), name: String(r.name).trim(), weight: round(Number(r.w) || 0, 2), writing: !!(r.writing || old?.writing) }; });
-  for (const d of used) if (!doms.some(x => x.id === d.id)) doms.push({ ...d, weight: 0 });
+  // domínios antigos agrupados pelo domínio novo a que correspondem (pode haver vários: juntam-se)
+  const groups = {}; for (const d of cls.domains) { const i = map[d.id]; if (i !== undefined && i >= 0) (groups[i] ||= []).push(d); }
+  for (const olds of Object.values(groups)) if (olds.length > 1) giMergeDomains(cls, olds[0].id, olds.slice(1).map(d => d.id));
+  const doms = rows.map((r, i) => { const olds = groups[i] || []; return { id: olds[0] ? olds[0].id : uid(), name: String(r.name).trim(), weight: round(Number(r.w) || 0, 2), writing: !!(r.writing || olds.some(o => o.writing)) }; });
+  for (const d of used) if (!doms.some(x => x.id === d.id) && !(map[d.id] >= 0)) doms.push({ ...d, weight: 0 });
   cls.domains = doms;
   if (cuts && isBasic(cls)) cls.levelCuts = cuts.slice();
+}
+// Junta vários domínios num só (keep): nas perguntas muda o domínio; nas notas por domínio faz a média.
+function giMergeDomains(cls, keep, others) {
+  const all = [keep, ...others];
+  for (const m of cls.moments) {
+    if (m.mode === 'perguntas') { (m.questions || []).forEach(q => { if (others.includes(q.domainId)) q.domainId = keep; }); continue; }
+    const ids = m.domainIds || []; const present = all.filter(id => ids.includes(id)); if (!present.length) continue;
+    if (present.length > 1 || present[0] !== keep) {
+      for (const sid of Object.keys(m.scores || {})) {
+        const row = m.scores[sid]; const vals = present.map(id => row[id]).filter(v => isNum(v)).map(Number);
+        present.forEach(id => { if (id !== keep) delete row[id]; });
+        if (vals.length) row[keep] = round(sum(vals) / vals.length, 2); else delete row[keep];
+      }
+      m.domainIds = [...new Set(ids.map(id => all.includes(id) ? keep : id))];
+    }
+  }
 }
 async function exportGrelha(c) {
   const rows = [[`Grelha de critérios — ${c.subject} — ${c.level === 'basico' ? cic(c) + ' (níveis 1 a 5)' : (LEVEL_LABEL[c.level] || '')}`], [], ['Domínio', 'Peso']];
