@@ -2009,20 +2009,23 @@ function botaoInstalar() {
   document.head.appendChild(st);
   const b = document.createElement('button'); b.id = 'instalarPauta'; b.type = 'button';
   b.innerHTML = `<span class="instIc">⬇</span><span>Instalar a PAUTA no computador<small>Fica no ambiente de trabalho e atualiza-se sozinha</small></span>`;
-  b.onclick = async () => {
-    if (pedidoInstalar) {
-      pedidoInstalar.prompt();
-      try { const r = await pedidoInstalar.userChoice; if (r.outcome === 'accepted') b.remove(); } catch (e) { }
-      pedidoInstalar = null; return;
-    }
+  b.onclick = () => {
     const edge = /Edg\//.test(navigator.userAgent), chrome = /Chrome\//.test(navigator.userAgent) && !edge;
     const safari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg/.test(navigator.userAgent);
-    const passos = edge ? `<li>Carregue nos <b>três pontinhos «…»</b>, no canto de cima à direita.</li><li>Escolha <b>«Aplicações»</b> e depois <b>«Instalar este site como aplicação»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
-      : chrome ? `<li>Na barra de endereço, do lado direito, carregue no ícone de instalar (um <b>ecrã com uma seta</b>).</li><li>Se não o vir: carregue nos <b>três pontinhos ⋮</b>, no canto de cima à direita, e escolha <b>«Transmitir, guardar e partilhar» › «Instalar página como app»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
+    const passos = edge ? `<li>Carregue nos <b>três pontinhos «…»</b>, no canto de cima à direita do Edge.</li><li>Escolha <b>«Aplicações»</b> e depois <b>«Instalar este site como aplicação»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
+      : chrome ? `<li>Na barra de endereço, do lado direito, carregue no ícone de instalar (um <b>ecrã com uma seta</b>).</li><li>Se não o vir: carregue nos <b>três pontinhos ⋮</b>, no canto de cima à direita do Chrome, e escolha <b>«Transmitir, guardar e partilhar» › «Instalar página como app»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
       : safari ? `<li>No menu <b>«Ficheiro»</b>, escolha <b>«Adicionar à Dock»</b>.</li><li>Carregue em <b>«Adicionar»</b>.</li>`
-      : `<li>Este navegador não instala a PAUTA. Abra este mesmo endereço no <b>Google Chrome</b> ou no <b>Microsoft Edge</b> e carregue outra vez neste botão.</li>`;
-    modal({ title: 'Instalar a PAUTA', intro: 'Fica com um ícone no ambiente de trabalho, abre numa janela própria, funciona sem Internet e recebe as atualizações sozinha.',
-      body: `<ol style="margin:0;padding-left:1.3em;line-height:1.7">${passos}</ol>`, actions: [{ label: 'Percebi', kind: 'primary' }] });
+      : `<li>Este navegador não instala a PAUTA. Copie o endereço que está lá em cima e abra-o no <b>Google Chrome</b> ou no <b>Microsoft Edge</b>.</li><li>Depois carregue outra vez neste botão laranja.</li>`;
+    const nota = `<p style="margin:14px 0 0;padding:10px 12px;border-radius:9px;background:var(--mark2);font-size:14px">Não é descarregado nenhum ficheiro. No fim, aparece um <b>ícone da PAUTA</b> no ambiente de trabalho e no menu Iniciar. Se o menu do navegador disser <b>«Abrir na PAUTA»</b>, é porque já está instalada.</p>`;
+    const tem = !!pedidoInstalar;
+    modal({ title: 'Instalar a PAUTA no computador',
+      intro: tem ? 'Carregue em «Instalar agora». Vai aparecer uma janelinha do navegador: carregue em «Instalar».' : 'Siga estes passos:',
+      body: (tem ? `<p style="margin:0 0 8px;font-weight:600">Se não aparecer a janelinha, faça assim:</p>` : '') + `<ol style="margin:0;padding-left:1.3em;line-height:1.7">${passos}</ol>` + nota,
+      actions: tem ? [{ label: 'Fechar' }, { label: 'Instalar agora', kind: 'primary', keepOpen: true, run: async () => {
+        const ev = pedidoInstalar; pedidoInstalar = null;
+        try { await ev.prompt(); const r = await ev.userChoice; if (r.outcome === 'accepted') { b.remove(); closeModal(); return; } return mErr('A instalação foi cancelada. Pode tentar pelos passos acima.'); }
+        catch (e) { return mErr('O navegador não abriu a janela de instalação. Siga os passos acima.'); }
+      } }] : [{ label: 'Percebi', kind: 'primary' }] });
   };
   document.body.appendChild(b);
 }
@@ -2030,7 +2033,7 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedido
 window.addEventListener('appinstalled', () => { $('#instalarPauta')?.remove(); pedidoInstalar = null; toast('A PAUTA ficou instalada. Já a pode abrir pelo ícone no ambiente de trabalho.', 5000); });
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', botaoInstalar); else botaoInstalar();
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.5';
+const PAUTA_VERSAO = '3.2.6';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
