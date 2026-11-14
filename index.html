@@ -1994,8 +1994,43 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png'], ['icon', 'icon-192.png']]) { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
+// ---------------------------------------------------------------- botão «Instalar a PAUTA» (bem visível, só no navegador)
+let pedidoInstalar = null;
+const jaInstalada = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
+function botaoInstalar() {
+  if (!/^https?:$/.test(location.protocol) || LOCAL || jaInstalada() || $('#instalarPauta')) return;
+  const st = document.createElement('style');
+  st.textContent = `#instalarPauta{position:fixed;right:22px;bottom:22px;z-index:420;display:flex;align-items:center;gap:12px;padding:14px 22px 14px 16px;border:0;border-radius:14px;background:var(--pen);color:#fff;font:700 16px var(--sans);box-shadow:0 12px 34px #0006;cursor:pointer;animation:instPulse 2.4s ease-in-out 3}
+#instalarPauta:hover{background:var(--pen2)}#instalarPauta .instIc{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#fff3;font-size:20px;line-height:1}
+#instalarPauta small{display:block;font:500 12.5px var(--sans);opacity:.92;margin-top:2px}
+@keyframes instPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@media (max-width:600px){#instalarPauta{left:12px;right:12px;bottom:12px;justify-content:center}}
+@media print{#instalarPauta{display:none}}`;
+  document.head.appendChild(st);
+  const b = document.createElement('button'); b.id = 'instalarPauta'; b.type = 'button';
+  b.innerHTML = `<span class="instIc">⬇</span><span>Instalar a PAUTA no computador<small>Fica no ambiente de trabalho e atualiza-se sozinha</small></span>`;
+  b.onclick = async () => {
+    if (pedidoInstalar) {
+      pedidoInstalar.prompt();
+      try { const r = await pedidoInstalar.userChoice; if (r.outcome === 'accepted') b.remove(); } catch (e) { }
+      pedidoInstalar = null; return;
+    }
+    const edge = /Edg\//.test(navigator.userAgent), chrome = /Chrome\//.test(navigator.userAgent) && !edge;
+    const safari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg/.test(navigator.userAgent);
+    const passos = edge ? `<li>Carregue nos <b>três pontinhos «…»</b>, no canto de cima à direita.</li><li>Escolha <b>«Aplicações»</b> e depois <b>«Instalar este site como aplicação»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
+      : chrome ? `<li>Na barra de endereço, do lado direito, carregue no ícone de instalar (um <b>ecrã com uma seta</b>).</li><li>Se não o vir: carregue nos <b>três pontinhos ⋮</b>, no canto de cima à direita, e escolha <b>«Transmitir, guardar e partilhar» › «Instalar página como app»</b>.</li><li>Carregue em <b>«Instalar»</b>.</li>`
+      : safari ? `<li>No menu <b>«Ficheiro»</b>, escolha <b>«Adicionar à Dock»</b>.</li><li>Carregue em <b>«Adicionar»</b>.</li>`
+      : `<li>Este navegador não instala a PAUTA. Abra este mesmo endereço no <b>Google Chrome</b> ou no <b>Microsoft Edge</b> e carregue outra vez neste botão.</li>`;
+    modal({ title: 'Instalar a PAUTA', intro: 'Fica com um ícone no ambiente de trabalho, abre numa janela própria, funciona sem Internet e recebe as atualizações sozinha.',
+      body: `<ol style="margin:0;padding-left:1.3em;line-height:1.7">${passos}</ol>`, actions: [{ label: 'Percebi', kind: 'primary' }] });
+  };
+  document.body.appendChild(b);
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedidoInstalar = e; botaoInstalar(); });
+window.addEventListener('appinstalled', () => { $('#instalarPauta')?.remove(); pedidoInstalar = null; toast('A PAUTA ficou instalada. Já a pode abrir pelo ícone no ambiente de trabalho.', 5000); });
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', botaoInstalar); else botaoInstalar();
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.4';
+const PAUTA_VERSAO = '3.2.5';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2142,6 +2177,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Botão «Instalar a PAUTA no computador», bem visível no canto do ecrã: com um clique, a PAUTA fica no ambiente de trabalho e passa a atualizar-se sozinha.',
   'Anular e Refazer: enganou-se? Carregue em «Anular» (no topo, ao lado do estado da gravação) ou em Ctrl+Z. Pode anular várias vezes seguidas (até 50 passos) e voltar a pôr com «Refazer» (Ctrl+Y).',
   'Agora também para o 2.º ciclo: ao criar a turma (ou em «Editar turma»), escolha «2.º ciclo — níveis 1 a 5». Funciona como o 3.º ciclo e os títulos das grelhas dizem «2.º ciclo».',
   'Novo separador «Sínteses»: síntese descritiva de cada aluno com frases pré-feitas (aproveitamento, evolução, domínios, empenho, comportamento, métodos de trabalho, assiduidade e recomendações). A PAUTA sugere frases a partir das notas e o texto pode ser corrigido à mão, copiado para o Inovar, impresso ou exportado para Excel.',
