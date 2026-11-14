@@ -390,6 +390,8 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .qmv{height:32px;max-width:220px;border:1px solid #cfdad5;border-radius:8px;padding:0 6px;font-size:12.5px;color:var(--ink2);background:#fff}
 .grade thead tr:nth-child(3) th{top:62px}.grade thead tr.subrow th{font-style:italic;font-weight:600;font-size:12px;background:#f7faf8;color:var(--ink2)}.grade thead tr.subrow th.dt{font-style:normal}.pt th.sub{font-style:italic;font-weight:600}
 .grade th.st,.grade td.st{background:#fbf6ef}.grade td.st b{display:block;color:var(--pen2)}.grade td.st small{display:block;font-size:11px;color:var(--graph)}.grade td.st.partial{background:#fdf1e6}
+.pwrow{display:flex;gap:8px}.pwrow input{flex:1;min-width:0}.capsw{margin:-4px 0 10px;padding:8px 12px;border-radius:8px;background:var(--pen3);color:var(--pen2);font-weight:600;font-size:13.5px}
+.subw{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:4px 0 10px;padding:8px 12px;border-radius:8px;background:#fbf6ef;font-size:13px}.subw>span{width:100%;color:var(--ink2);font-weight:600}.subw label{display:inline-flex;align-items:center;gap:6px;font-style:italic}.subw input{width:56px;height:30px;border:1px solid #cfdad5;border-radius:6px;text-align:center;font-style:normal}.subw small{font-style:normal;color:var(--graph)}.subw small.bad{color:var(--bad);font-weight:700}.subw small.ok{color:var(--ok)}
 </style><script>window.pautaLib=(function(){const cache={};return function(key){if(!cache[key])cache[key]=(async()=>{const el=document.getElementById('lib-'+key);
 const bytes=Uint8Array.from(atob(el.textContent.trim()),c=>c.charCodeAt(0));if(!('DecompressionStream' in window))throw new Error('Navegador desatualizado: use o Chrome ou o Edge.');
 const blob=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).blob();return URL.createObjectURL(new Blob([blob],{type:'text/javascript'}));})().catch(e=>{delete cache[key];throw e;});return cache[key];};})();</script></head>
@@ -477,10 +479,14 @@ const conteudosOf = c => (c.conteudos || []).map(x => String(x).trim()).filter(B
 const momentHasSub = m => m.mode === 'perguntas' && (m.questions || []).some(q => q.sub);
 function subGroups(qs, width = () => 1) { const g = []; qs.forEach(q => { const k = q.sub || ''; const last = g[g.length - 1]; if (last && last.sub === k) { last.n += width(q); last.qs.push(q); } else g.push({ sub: k, n: width(q), qs: [q] }); }); return g; }
 // Nota de cada conteúdo dentro de um domínio (só quando o domínio tem 2 ou mais conteúdos neste teste).
+const domainQuestions = (m, did) => { const qs = domainQuestions0(m, did); if (!qs.some(q => q.sub)) return qs; const order = domainSubs(m, did); return qs.map((q, i) => ({ q, i })).sort((a, b) => order.indexOf(a.q.sub || '') - order.indexOf(b.q.sub || '') || a.i - b.i).map(x => x.q); };
 const subCols = (m, did) => { if (!momentHasSub(m)) return null; const g = subGroups(domainQuestions(m, did)); return g.length > 1 ? g : null; };
 function subJoin(m, did, arr, mk) { const g = subCols(m, did); if (!g) return arr.join(''); let out = '', k = 0; g.forEach((grp, gi) => { out += arr.slice(k, k + grp.qs.length).join('') + mk(grp, gi); k += grp.qs.length; }); return out; }
 function subPoints(m, sid, qs) { if (isAbsent(m, sid)) return null; const q2 = qs.filter(q => !isNA(m, sid, q.id)); if (!q2.length) return null; const v = q2.map(q => scoreOf(m, sid, q.id)); if (v.every(x => x === null)) return null; return { pts: sum(v.filter(x => x !== null)), max: sum(q2.map(q => Number(q.max) || 0)), complete: v.every(x => x !== null) }; }
-const domainQuestions = (m, did) => m.mode === 'perguntas' ? m.questions.filter(q => q.domainId === did) : [];
+// Conteúdos de um domínio num teste (pela ordem em que aparecem) e peso de cada um (por omissão, iguais).
+const domainSubs = (m, did) => [...new Set((m.questions || []).filter(q => q.domainId === did).map(q => q.sub || ''))];
+const subWeight = (m, did, sub) => { const w = Number(m.subw?.[did]?.[sub]); return Number.isFinite(w) && w >= 0 ? w : 1; };
+const domainQuestions0 = (m, did) => m.mode === 'perguntas' ? m.questions.filter(q => q.domainId === did) : [];
 function domainMaxIn(m, did) { return m.mode === 'perguntas' ? sum(domainQuestions(m, did).map(q => Number(q.max) || 0)) : (Number(m.scale) || 200); }
 const scoreOf = (m, sid, key) => { const v = m.scores?.[sid]?.[key]; return isNum(v) ? Number(v) : null; };
 const isAbsent = (m, sid) => !!m.absent?.[sid];
@@ -493,6 +499,14 @@ const medBadge = s => s?.medidas ? `<span class="medb" title="Aluno com medidas 
 function domainPoints(m, sid, did) {
   if (isAbsent(m, sid)) return null;
   if (m.mode === 'perguntas') {
+    const sg = subCols(m, did);
+    if (sg) {
+      const parts = sg.map(g => ({ r: subPoints(m, sid, g.qs), w: subWeight(m, did, g.sub) })).filter(x => x.r && x.r.max > 0 && x.w > 0);
+      if (!parts.length) return null;
+      const W = sum(parts.map(x => x.w)); const f = sum(parts.map(x => x.w * x.r.pts / x.r.max)) / W;
+      const complete = parts.every(x => x.r.complete) && sg.every(g => subPoints(m, sid, g.qs) !== null || g.qs.every(q => isNA(m, sid, q.id)));
+      return { pts: f * 100, max: 100, complete };
+    }
     const qs = domainQuestions(m, did).filter(q => !isNA(m, sid, q.id)); if (!qs.length) return null;
     const vals = qs.map(q => scoreOf(m, sid, q.id));
     if (vals.every(v => v === null)) return null;
@@ -1057,16 +1071,17 @@ function momentForm(c, existing = null) {
   const m = existing ? JSON.parse(JSON.stringify(existing)) : { id: uid(), name: '', short: '', term: prof ? 0 : view.term, date: new Date().toISOString().slice(0, 10), weight: 1, mode: 'perguntas', numbering: 'dominio', questions: [], domainIds: [], scale: S, scores: {}, rubrics: {}, absent: {}, created: Date.now(), ...(prof ? { moduleId: view.mod && view.mod !== '_none' ? view.mod : (c.modules?.[0]?.id || '') } : {}) };
   // Cotação máxima por domínio = escala do nível (100 ou 200). Momentos antigos com cotação maior mantêm-se (não se perdem notas).
   const origTot = {}; if (existing?.mode === 'perguntas') for (const q of existing.questions) origTot[q.domainId] = (origTot[q.domainId] || 0) + (Number(q.max) || 0);
-  const limitOf = did => Math.max(S, round(origTot[did] || 0, 2));
+  const nSubs = did => { const n = domainSubs(m, did).length; return n >= 2 && domainSubs(m, did).some(Boolean) ? n : 1; };
+  const limitOf = did => Math.max(S * nSubs(did), round(origTot[did] || 0, 2));
   const hasScores = existing && Object.keys(existing.scores || {}).some(k => Object.keys(existing.scores[k] || {}).length);
   // Numeração: «dominio» recomeça em 1 em cada domínio; «seguida» (testes antigos) numera 1, 2, 3… no teste todo.
   const perDomain = () => m.numbering === 'dominio';
-  const nextLabel = did => String((perDomain() ? m.questions.filter(q => q.domainId === did).length : m.questions.length) + 1);
+  const nextLabel = (did, sub = '') => String((perDomain() ? m.questions.filter(q => q.domainId === did && (q.sub || '') === sub).length : m.questions.length) + 1);
   // Enquanto as perguntas tiverem números simples (1, 2, 3…), a PAUTA mantém-nos por ordem.
   const autoLabels = () => {
     if (!m.questions.every(q => /^\d+$/.test(String(q.label).trim()))) return;
     if (!perDomain()) { m.questions.forEach((q, i) => q.label = String(i + 1)); return; }
-    const k = {}; m.questions.forEach(q => { k[q.domainId] = (k[q.domainId] || 0) + 1; q.label = String(k[q.domainId]); });
+    const k = {}; m.questions.forEach(q => { const key = q.domainId + '|' + (q.sub || ''); k[key] = (k[key] || 0) + 1; q.label = String(k[key]); });
   };
   const writingOK = d => isPortuguese(c) && d.writing;
   const draw = box => {
@@ -1086,15 +1101,16 @@ function momentForm(c, existing = null) {
     const doms = c.domains.filter(d => sel.has(d.id));
     if (!doms.length) { qbox.innerHTML = '<p class="hint">Escolha acima os domínios que este teste avalia.</p>'; return; }
     const numPick = `<div class="numpick"><span>Numeração das perguntas</span><div class="seg sm">
-        <button type="button" data-numbering="dominio" class="${perDomain() ? 'on' : ''}">Recomeça em cada domínio</button>
+        <button type="button" data-numbering="dominio" class="${perDomain() ? 'on' : ''}">Recomeça em cada ${m.questions.some(q => q.sub) ? 'conteúdo' : 'domínio'}</button>
         <button type="button" data-numbering="seguida" class="${perDomain() ? '' : 'on'}">Seguida no teste todo</button></div>
         <small>Pode também escrever o número que quiser em cada pergunta, igual ao do enunciado (ex.: I.1, II.3, 2.a).</small></div>`;
     qbox.innerHTML = numPick + doms.map(d => {
-      const qs = m.questions.filter(q => q.domainId === d.id); const tot = sum(qs.map(q => Number(q.max) || 0));
+      const qs = domainQuestions(m, d.id); const tot = sum(qs.map(q => Number(q.max) || 0));
       const lim = limitOf(d.id);
-      return `<div class="qblock"><div class="qbh"><b>${esc(d.name)}</b><span class="qtot ${tot > lim + 1e-9 ? 'over' : Math.abs(tot - lim) < 0.01 ? 'ok' : ''}" data-lim="${lim}">${fmtMax(tot)} / ${lim} pontos${tot > lim + 1e-9 ? ' — ultrapassa o máximo' : lim > S ? ' (cotação original deste momento)' : ''}</span>
+      const subsD = domainSubs(m, d.id); const subRow = subsD.length >= 2 && subsD.some(Boolean) ? `<div class="subw"><span>Cada conteúdo vale ${S} pontos. Peso de cada um na nota de «${esc(d.name)}»:</span>${subsD.map(sb => { const tt = sum(qs.filter(q => (q.sub || '') === sb).map(q => Number(q.max) || 0)); return `<label>${esc(sb || 'sem conteúdo')} <input data-subw="${d.id}|${esc(sb)}" value="${fmtMax(Number(m.subw?.[d.id]?.[sb]) >= 0 && m.subw?.[d.id]?.[sb] !== undefined ? m.subw[d.id][sb] : round(100 / subsD.length, 2))}" inputmode="decimal">%<small class="${tt > S + 1e-9 ? 'bad' : Math.abs(tt - S) < 0.01 ? 'ok' : ''}">${fmtMax(tt)}/${S} pts</small></label>`; }).join('')}</div>` : '';
+      return `<div class="qblock"><div class="qbh"><b>${esc(d.name)}</b><span class="qtot ${tot > lim + 1e-9 ? 'over' : Math.abs(tot - lim) < 0.01 ? 'ok' : ''}" data-lim="${lim}">${fmtMax(tot)} / ${lim} pontos${tot > lim + 1e-9 ? ' — ultrapassa o máximo' : lim > S * nSubs(d.id) ? ' (cotação original deste momento)' : nSubs(d.id) > 1 ? ` (${S} por conteúdo)` : ''}</span>
         <button type="button" class="btn xs" data-split="${d.id}" title="Dividir ${S} pontos igualmente">Dividir ${S}</button><button type="button" class="btn xs" data-addq="${d.id}">${ic('plus')}Pergunta</button></div>
-        ${qs.length ? '<div class="qrow qhead"><span class="ql">Pergunta</span><span class="qm">Cotação</span></div>' : ''}${qs.map(q => `<div class="qrow"><input class="ql" data-ql="${q.id}" value="${esc(q.label)}" aria-label="Pergunta" placeholder="N.º">
+        ${subRow}${qs.length ? '<div class="qrow qhead"><span class="ql">Pergunta</span><span class="qm">Cotação</span></div>' : ''}${qs.map(q => `<div class="qrow"><input class="ql" data-ql="${q.id}" value="${esc(q.label)}" aria-label="Pergunta" placeholder="N.º">
           <input class="qm" data-qm="${q.id}" value="${esc(q.max)}" inputmode="decimal" aria-label="Cotação"><span class="unit">pontos</span>
           ${(conteudosOf(c).length || m.questions.some(x => x.sub)) ? `<select class="qmv qsub" data-qsub="${q.id}" title="Conteúdo desta pergunta" aria-label="Conteúdo desta pergunta"><option value="">Conteúdo: —</option>${[...new Set([...conteudosOf(c), ...m.questions.map(x => x.sub).filter(Boolean)])].map(x => `<option value="${esc(x)}" ${x === q.sub ? 'selected' : ''}>Conteúdo: ${esc(x)}</option>`).join('')}</select>` : ''}
           ${c.domains.length > 1 ? `<select class="qmv" data-qmv="${q.id}" title="Mudar esta pergunta para outro domínio (as notas já lançadas mantêm-se)" aria-label="Domínio desta pergunta">${c.domains.map(x => `<option value="${x.id}" ${x.id === q.domainId ? 'selected' : ''}>Conta para: ${esc(x.name)}</option>`).join('')}</select>` : ''}
@@ -1121,12 +1137,13 @@ function momentForm(c, existing = null) {
   modal({
     title: existing ? 'Editar momento de avaliação' : 'Novo momento de avaliação', wide: true, body,
     onOpen: box => {
+      if (m.mode === 'perguntas' && m.questions.some(q => q.sub)) sortQuestions();
       draw(box);
       box.addEventListener('click', e => {
         const mode = e.target.closest('[data-mode]'); if (mode && !hasScores) { const prev = m.mode; m.mode = mode.dataset.mode; if (prev !== m.mode) { if (m.mode === 'dominios') m.domainIds = [...new Set(m.questions.map(q => q.domainId).concat(m._pending || []))]; else { m._pending = m.domainIds.slice(); } } draw(box); return; }
         const nb = e.target.closest('[data-numbering]'); if (nb) { m.numbering = nb.dataset.numbering; autoLabels(); draw(box); return; }
-        const add = e.target.closest('[data-addq]'); if (add) { const prevQ = m.questions.filter(q => q.domainId === add.dataset.addq).pop(); m.questions.push({ id: uid(), label: nextLabel(add.dataset.addq), domainId: add.dataset.addq, max: 0, rubric: false, ...(prevQ?.sub ? { sub: prevQ.sub } : {}) }); sortQuestions(); draw(box); box.querySelector(`[data-qm="${m.questions.find(q => q.domainId === add.dataset.addq && q.max === 0)?.id}"]`)?.focus(); return; }
-        const split = e.target.closest('[data-split]'); if (split) { const qs = m.questions.filter(q => q.domainId === split.dataset.split); const each = Math.floor(S / qs.length * 10) / 10; qs.forEach((q, i) => q.max = i === qs.length - 1 ? round(S - each * (qs.length - 1), 1) : each); draw(box); return; }
+        const add = e.target.closest('[data-addq]'); if (add) { const prevQ = m.questions.filter(q => q.domainId === add.dataset.addq).pop(); m.questions.push({ id: uid(), label: nextLabel(add.dataset.addq, prevQ?.sub || ''), domainId: add.dataset.addq, max: 0, rubric: false, ...(prevQ?.sub ? { sub: prevQ.sub } : {}) }); sortQuestions(); draw(box); box.querySelector(`[data-qm="${m.questions.find(q => q.domainId === add.dataset.addq && q.max === 0)?.id}"]`)?.focus(); return; }
+        const split = e.target.closest('[data-split]'); if (split) { const did = split.dataset.split; const groups = nSubs(did) > 1 ? domainSubs(m, did).map(sb => m.questions.filter(q => q.domainId === did && (q.sub || '') === sb)) : [m.questions.filter(q => q.domainId === did)]; for (const qs of groups) { const each = Math.floor(S / qs.length * 10) / 10; qs.forEach((q, i) => q.max = i === qs.length - 1 ? round(S - each * (qs.length - 1), 1) : each); } draw(box); return; }
         const del = e.target.closest('[data-delq]'); if (del) { m.questions = m.questions.filter(q => q.id !== del.dataset.delq); autoLabels(); draw(box); return; }
       });
       box.addEventListener('change', e => {
@@ -1140,7 +1157,8 @@ function momentForm(c, existing = null) {
         }
         if (t.name === 'scale') { m.scale = Number(t.value); return; }
         if (t.dataset.qr) { const q = m.questions.find(x => x.id === t.dataset.qr); q.rubric = t.checked; }
-        if (t.dataset.qsub) { const q = m.questions.find(x => x.id === t.dataset.qsub); if (q) { if (t.value) q.sub = t.value; else delete q.sub; } return; }
+        if (t.dataset.qsub) { const q = m.questions.find(x => x.id === t.dataset.qsub); if (q) { if (t.value) q.sub = t.value; else delete q.sub; sortQuestions(); draw(box); } return; }
+        if (t.dataset.subw) { const [did, sb] = t.dataset.subw.split('|'); const v = parseNum(t.value); m.subw ||= {}; m.subw[did] ||= {}; if (Number.isFinite(v) && v >= 0) m.subw[did][sb] = v; return; }
         if (t.dataset.qmv) { const q = m.questions.find(x => x.id === t.dataset.qmv); const d = c.domains.find(x => x.id === t.value); if (!q || !d) return; q.domainId = d.id; if (!writingOK(d)) q.rubric = false; sortQuestions(); draw(box); return; }
       });
       box.addEventListener('input', e => {
@@ -1149,7 +1167,7 @@ function momentForm(c, existing = null) {
         if (t.dataset.qm) { const v = parseNum(t.value); const q = m.questions.find(x => x.id === t.dataset.qm); q.max = Number.isFinite(v) ? v : q.max; t.classList.toggle('bad', !(v > 0)); const b = t.closest('.qblock'); const tot = sum(m.questions.filter(x => x.domainId === q.domainId).map(x => Number(x.max) || 0)); const el = b.querySelector('.qtot'); const lim = Number(el.dataset.lim) || S; const over = tot > lim + 1e-9; el.textContent = fmtMax(tot) + ' / ' + lim + ' pontos' + (over ? ' — ultrapassa o máximo' : ''); el.classList.toggle('ok', !over && Math.abs(tot - lim) < 0.01); el.classList.toggle('over', over); t.classList.toggle('bad', !(v > 0) || v > lim + 1e-9); }
         if (t.id === 'fName' && !$('#fShort').value) $('#fShort').placeholder = shortName({ name: t.value || 'Teste 1' });
       });
-      function sortQuestions() { const order = c.domains.map(d => d.id); m.questions.sort((a, b) => order.indexOf(a.domainId) - order.indexOf(b.domainId)); autoLabels(); }
+      function sortQuestions() { const order = c.domains.map(d => d.id); const so = {}; m.questions.forEach(q => { (so[q.domainId] ||= []); if (!so[q.domainId].includes(q.sub || '')) so[q.domainId].push(q.sub || ''); }); m.questions = m.questions.map((q, i) => ({ q, i })).sort((a, b) => order.indexOf(a.q.domainId) - order.indexOf(b.q.domainId) || so[a.q.domainId].indexOf(a.q.sub || '') - so[b.q.domainId].indexOf(b.q.sub || '') || a.i - b.i).map(x => x.q); autoLabels(); }
     },
     actions: [{ label: 'Cancelar' }, {
       label: existing ? 'Guardar alterações' : 'Criar e começar a corrigir', kind: 'primary', run: () => {
@@ -1160,7 +1178,8 @@ function momentForm(c, existing = null) {
           m.questions = m.questions.filter(q => c.domains.some(d => d.id === q.domainId));
           if (!m.questions.length) return mErr('Escolha pelo menos um domínio.');
           if (m.questions.some(q => !(Number(q.max) > 0))) return mErr('Todas as perguntas precisam de uma cotação maior que zero.');
-          for (const id of new Set(m.questions.map(q => q.domainId))) { const tot = sum(m.questions.filter(q => q.domainId === id).map(q => Number(q.max) || 0)); if (tot > limitOf(id) + 1e-9) return mErr(`«${c.domains.find(d => d.id === id)?.name}» tem ${fmtMax(tot)} pontos: o máximo é ${limitOf(id)} pontos por domínio${isBasic(c) ? ' no 3.º ciclo' : ''}.`); }
+          for (const id of new Set(m.questions.map(q => q.domainId))) { const tot = sum(m.questions.filter(q => q.domainId === id).map(q => Number(q.max) || 0)); if (tot > limitOf(id) + 1e-9) return mErr(`«${c.domains.find(d => d.id === id)?.name}» tem ${fmtMax(tot)} pontos: o máximo é ${limitOf(id)} pontos${nSubs(id) > 1 ? ` (${S} por conteúdo)` : ' por domínio'}.`);
+            if (nSubs(id) > 1) for (const sb of domainSubs(m, id)) { const t2 = sum(m.questions.filter(q => q.domainId === id && (q.sub || '') === sb).map(q => Number(q.max) || 0)); if (t2 > S + 1e-9 && !(origTot[id] > S * nSubs(id))) return mErr(`O conteúdo «${sb || 'sem conteúdo'}» em «${c.domains.find(d => d.id === id)?.name}» tem ${fmtMax(t2)} pontos: cada conteúdo vale no máximo ${S} pontos.`); } }
           if (m.questions.some(q => !String(q.label).trim())) return mErr('Todas as perguntas precisam de um número (ex.: 1.1).');
           m.domainIds = [];
         } else { if (!m.domainIds.length) return mErr('Escolha pelo menos um domínio.'); m.questions = []; }
@@ -1537,7 +1556,7 @@ function printBlank(c, m) {
     for (const id of ids) {
       const qs = domainQuestions(m, id); const sc = subCols(m, id); const span = sum(qs.map(q => q.rubric ? rubCols.length + 1 : 1)) + 1 + (sc ? sc.length : 0); ncols += span;
       h1 += `<th colspan="${span}">${esc(D(id).name)}</th>`;
-      if (hasSub) hS += subGroups(qs, q => q.rubric ? rubCols.length + 1 : 1).map(g => `<th colspan="${g.n + (sc ? 1 : 0)}" class="sub">${esc(g.sub || '—')}</th>`).join('') + `<th rowspan="2" class="tot">Total<small>${fmtMax(domainMaxIn(m, id))}</small></th>`;
+      if (hasSub) hS += subGroups(qs, q => q.rubric ? rubCols.length + 1 : 1).map(g => `<th colspan="${g.n + (sc ? 1 : 0)}" class="sub">${esc(g.sub || '—')}</th>`).join('') + `<th rowspan="2" class="tot">${sc ? 'Domínio<small>%</small>' : `Total<small>${fmtMax(domainMaxIn(m, id))}</small>`}</th>`;
       h2 += subJoin(m, id, qs.map(q => q.rubric ? rubCols.map(k => `<th class="rub">${esc(q.label)}·${k}</th>`).join('') + `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>` : `<th>${esc(q.label)}<small>${fmtMax(q.max)}</small></th>`), g => `<th class="tot">Nota<small>${fmtMax(sum(g.qs.map(q => Number(q.max) || 0)))}</small></th>`) + (hasSub ? '' : `<th class="tot">Total<small>${fmtMax(domainMaxIn(m, id))}</small></th>`);
     }
   } else { for (const id of ids) { ncols++; h1 += `<th rowspan="2">${esc(D(id).name)}<small>0–${m.scale || 200}</small></th>`; } }
@@ -1759,20 +1778,27 @@ function createPassword() {
 }
 function lockScreen(msg = '') {
   const g = gate(`<h1>Olá de novo.</h1><p>Introduza a palavra-passe para abrir os seus dados.</p>
-    <label class="f">Palavra-passe<input type="password" id="pw" autocomplete="current-password"></label>
+    <label class="f">Palavra-passe<span class="pwrow"><input type="password" id="pw" autocomplete="current-password"><button type="button" class="btn" id="pwEye" title="Mostrar o que está a escrever">Mostrar</button></span></label>
+    <div class="capsw" id="capsHint" hidden>Atenção: as maiúsculas (Caps Lock) estão ligadas.</div>
     <div class="gerr" id="gerr">${esc(msg)}</div><button class="btn primary lg" id="pgo">Abrir</button>
     <div class="glinks"><button class="link" id="gOpen">Abrir dados de uma pen ou ficheiro</button><button class="link danger" id="gReset">Esqueci-me da palavra-passe</button></div>`);
   const submit = async () => {
     const pw = $('#pw').value; if (!pw) return; $('#pgo').disabled = true; $('#gerr').textContent = 'A abrir…';
-    try {
-      const env = await idbGet('vault'); const { data, key } = await decryptEnvelope(env, pw);
-      if (!validState(data)) throw new Error('dados');
-      APP.state = data; APP.key = key; APP.salt = unb64(env.salt); APP.demo = false; APP.version = APP.savedVersion = 0;
-      closeGate(); go('home'); restorePen(pw); setTimeout(() => mostrarNovidades(ofertaInstalar), 2000);
-    } catch (e) { $('#gerr').textContent = 'Palavra-passe errada. Tente de novo.'; $('#pgo').disabled = false; $('#pw').select(); }
+    let env, data, key;
+    try { env = await idbGet('vault'); ({ data, key } = await decryptEnvelope(env, pw)); }
+    catch (e) { $('#gerr').textContent = 'Palavra-passe errada. Tente de novo. Confirme as maiúsculas e use «Mostrar» para ver o que escreveu.'; $('#pgo').disabled = false; $('#pw').select(); return; }
+    if (!validState(data)) { $('#gerr').textContent = 'A palavra-passe está certa, mas os dados deste computador estão num formato que a PAUTA não reconhece. Use «Abrir dados de uma pen ou ficheiro» com uma cópia de segurança.'; $('#pgo').disabled = false; return; }
+    APP.state = data; APP.key = key; APP.salt = unb64(env.salt); APP.demo = false; APP.version = APP.savedVersion = 0;
+    try { closeGate(); go('home'); }
+    catch (e) { console.error(e); toast('Os dados abriram, mas houve um erro a mostrar o ecrã: ' + (e.message || e) + '. Os dados não se perderam.', 9000); }
+    try { restorePen(pw); } catch (e) { console.error(e); }
+    setTimeout(() => mostrarNovidades(ofertaInstalar), 2000);
   };
   $('#pgo').onclick = submit; $('#pw').onkeydown = e => { if (e.key === 'Enter') submit(); };
   $('#gOpen').onclick = openMyData;
+  $('#pwEye').onclick = () => { const i = $('#pw'); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pwEye').textContent = show ? 'Esconder' : 'Mostrar'; i.focus(); };
+  const caps = e => { if (e.getModifierState) $('#capsHint').hidden = !e.getModifierState('CapsLock'); };
+  $('#pw').addEventListener('keydown', caps); $('#pw').addEventListener('keyup', caps);
   $('#gReset').onclick = () => {
     const g2 = gate(`<h1>Sem a palavra-passe não é possível abrir os dados.</h1><p>Estão cifrados e ninguém os consegue ler — nem a PAUTA. Pode abrir uma cópia que tenha guardado com outra palavra-passe, ou apagar tudo neste computador e começar de novo.</p>
       <label class="f">Para apagar tudo, escreva APAGAR<input id="del"></label><div class="gerr" id="gerr"></div>
@@ -2024,7 +2050,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.2.8';
+const PAUTA_VERSAO = '3.3.0';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2171,6 +2197,9 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Conteúdos: cada conteúdo de um domínio vale 100 pontos (200 no secundário) e tem um peso na nota do domínio (por omissão, pesos iguais). A nota do domínio é a média ponderada das notas dos conteúdos. As perguntas recomeçam no 1 em cada conteúdo.',
+  'Setas ↑ e ↓: ao preparar um teste e ao editar os domínios e pesos, as setas passam de uma linha para a outra, como na grelha de correção.',
+  'Ao abrir a PAUTA, pode carregar em «Mostrar» para ver a palavra-passe que está a escrever, e a PAUTA avisa quando as maiúsculas (Caps Lock) estão ligadas.',
   'Quando um domínio tem dois ou mais conteúdos no mesmo teste (ex.: Educação Literária e Gramática em Conhecimento), a grelha de correção mostra a nota de cada conteúdo e, a seguir, a nota do domínio. Também na grelha em branco e no Excel do teste.',
   'Conteúdos (opcional), para escolas com domínios gerais: em «Editar turma» escreva os conteúdos (ex.: Educação Literária, Gramática, Oralidade). Em cada teste, cada pergunta tem o seu domínio e o seu conteúdo, e a grelha de correção mostra Domínio › Conteúdo › Pergunta. O mesmo conteúdo pode contar para domínios diferentes.',
   'Ao editar um teste, cada pergunta tem a opção «Conta para:», para escolher o domínio a que pertence. Útil quando o mesmo conteúdo (por exemplo, a Educação Literária) conta para domínios diferentes consoante a pergunta. As notas já lançadas mantêm-se.',
@@ -3956,6 +3985,16 @@ document.addEventListener('keydown', e => {
   if (!APP.state) return;
   e.preventDefault();
   if (k === 'y' || (k === 'z' && e.shiftKey)) redoDo(); else undoDo();
+});
+
+// Setas ↑ e ↓ para passar de uma linha para a outra nos campos das perguntas, dos domínios e dos pesos.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  const t = e.target; if (!t || t.tagName !== 'INPUT') return;
+  const attr = ['data-qm', 'data-ql', 'data-dname', 'data-dweight', 'data-subw', 'data-gin', 'data-giw', 'data-cut'].find(a => t.hasAttribute(a)); if (!attr) return;
+  const scope = t.closest('.mbox') || document; const list = [...scope.querySelectorAll(`input[${attr}]`)].filter(i => i.offsetParent !== null);
+  const i = list.indexOf(t); const n = list[i + (e.key === 'ArrowDown' ? 1 : -1)]; if (!n) return;
+  e.preventDefault(); t.dispatchEvent(new Event('change', { bubbles: true })); n.focus(); n.select?.();
 });
 
 boot();
