@@ -266,6 +266,7 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .copyopts{display:grid;gap:6px;margin-top:10px}
 .grade.results td,.grade.results th{text-align:left;padding:8px 10px}
 .grade.results tr.low td{background:var(--pen3)}
+.grade td.gneg,.res.gneg{background:#fdf0ee!important}.grade td.gneg b,.res.gneg b{color:var(--bad)}
 .grade.results .rcol{min-width:170px}.grade.results .rcol b{margin-left:8px}
 .rbar{display:inline-block;vertical-align:middle;width:100px;height:8px;border-radius:5px;background:var(--line2);overflow:hidden}
 .rbar i{display:block;height:100%;background:var(--ok);border-radius:5px}.rbar.low i{background:var(--pen)}
@@ -1243,7 +1244,7 @@ function updateRow(c, m, sid) {
     const cv = $(`[data-conv="${sid}|${id}"]`);
     if (cv) { const g = domainGrade(m, sid, id); cv.textContent = g === null ? '' : isBasic(c) ? (Number(m.scale) === 100 ? `= ${fmt(g * 5, 0)}%` : `= ${fmt(g * 5, 1)} pts /100`) : Number(m.scale) === 20 ? `= ${fmt(g * 10, 0)} pts` : `= ${fmt(g, 1)} val.`; }
   }
-  const res = $(`[data-res="${sid}"]`); if (res) { const p = momentPercent(c, m, sid); res.innerHTML = isAbsent(m, sid) ? '<span class="mut">faltou</span>' : p === null ? '<span class="mut">—</span>' : `<b>${fmt(p, isBasic(c) ? 1 : 0)}%</b>${isBasic(c) ? '' : `<small>${fmt(p / 5, 1)} val.</small>`}`; }
+  const res = $(`[data-res="${sid}"]`); if (res) { const p = momentPercent(c, m, sid); res.innerHTML = isAbsent(m, sid) ? '<span class="mut">faltou</span>' : p === null ? '<span class="mut">—</span>' : `<b>${fmt(p, isBasic(c) ? 1 : 0)}%</b>${isBasic(c) ? '' : `<small>${fmt(p / 5, 1)} val.</small>`}`; res.classList.toggle('gneg', !isAbsent(m, sid) && p !== null && p < 50); }
 }
 function updateFoot(c, m) {
   const f = $('#gradeFoot'); if (!f) return; const st = activeStudents(c).filter(s => !isAbsent(m, s.id));
@@ -1394,8 +1395,8 @@ function pautaScreenHTML(c) {
     return `<tr><td class="n">${s.n || ''}</td><td class="nm">${esc(s.name)}${medBadge(s)}</td>${cols.map(({ d, ms }) => {
       const g = domainTermGrade(c, s, d.id, t);
       return ms.map(m => { const x = domainGrade(m, s.id, d.id); return `<td>${isAbsent(m, s.id) ? '<span class="mut">F</span>' : fmt(gShow(c, x), basic ? 0 : 1)}</td>`; }).join('') + `<td class="dt"><b>${fmt(gShow(c, g), 1)}</b></td><td class="dt">${g === null ? '—' : fmt(gShow(c, g) * d.weight / 100, 2)}</td>`;
-    }).join('')}${basic ? `<td class="fin"><b>${fg ? fmt(fg.pct, 0) + '%' + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin"><b>${fg ? basicLevel(c, fg.pct) : '—'}</b></td>`
-      : `<td class="fin"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin">${fg ? fmt(fg.pct, 0) + '%' : '—'}</td>`}
+    }).join('')}${(() => { const neg = fg && fg.pct < 50; return basic ? `<td class="fin${neg ? ' gneg' : ''}"><b>${fg ? fmt(fg.pct, 0) + '%' + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin${neg ? ' gneg' : ''}"><b>${fg ? basicLevel(c, fg.pct) : '—'}</b></td>`
+      : `<td class="fin${neg ? ' gneg' : ''}"><b>${fg ? fmt(fg.v20, 1) + (fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin${neg ? ' gneg' : ''}">${fg ? fmt(fg.pct, 0) + '%' : '—'}</td>`; })()}
       <td class="tn"><select data-tn="${s.id}|self" aria-label="Autoavaliação de ${esc(s.name)}">${scaleOpts(tn(s.id).self, '—')}</select></td>
       <td class="tn"><select class="final" data-tn="${s.id}|final" aria-label="Classificação final de ${esc(s.name)}">${scaleOpts(tn(s.id).final, fg ? 'Proposta: ' + (basic ? basicLevel(c, fg.pct) : Math.round(fg.v20)) : '—')}</select></td>
       <td class="tn"><input data-tn="${s.id}|obs" value="${esc(tn(s.id).obs || '')}" placeholder="Opcional" aria-label="Observações de ${esc(s.name)}"></td></tr>`;
@@ -2637,7 +2638,7 @@ function gridBasicHTML(c) {
     const evoCells = evo.map((e, i) => { const prev = evo.slice(0, i).reverse().find(Boolean); const arrow = e && prev ? (e.v > prev.v ? '<i class="up">▲</i>' : e.v < prev.v ? '<i class="dn">▼</i>' : '') : ''; return `<td class="evo ${i === t ? 'cur' : ''}">${e ? `<span class="${e.dec ? '' : 'mut'}" title="${e.dec ? 'Nível decidido' : 'Proposta (ainda não decidida)'}">${e.v}</span>${arrow}` : '<span class="mut">—</span>'}</td>`; }).join('');
     const stCell = r.stale ? `<span class="stb eval" title="${esc(logText(r.nt.log))}">Rever · proposta agora ${r.prop ?? '—'}</span>` : r.st === 'val' ? '<span class="stb ok">Validado</span>' : r.st === 'adj' ? `<span class="stb adj" title="${esc(logText(r.nt.log))}">Ajustado · proposta ${r.prop ?? '—'}</span>` : r.st === 'prop' ? `<button class="btn xs" data-tnok="${r.s.id}">${ic('check')}Validar ${r.prop}</button>` : '<span class="mut">—</span>';
     return `<tr><td class="n">${r.s.n || ''}</td><td class="nm">${esc(r.s.name)}${medBadge(r.s)}</td>${cols.map(({ d, ms }, k) => ms.map(m => { const x = domainGrade(m, r.s.id, d.id); return `<td>${isAbsent(m, r.s.id) ? '<span class="mut">F</span>' : fmt(gShow(c, x), 0)}</td>`; }).join('') + `<td class="dt"><b>${fmt(gShow(c, r.doms[k].g), 1)}</b></td>`).join('')}
-      <td class="fin"><b>${r.fg ? fmt(r.fg.pct, 1) + '%' + (r.fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin"><b>${r.prop ?? '—'}</b></td>
+      <td class="fin${r.fg && r.fg.pct < 50 ? ' gneg' : ''}"><b>${r.fg ? fmt(r.fg.pct, 1) + '%' + (r.fg.missing.length ? '*' : '') : '—'}</b></td><td class="fin${r.fg && r.fg.pct < 50 ? ' gneg' : ''}"><b>${r.prop ?? '—'}</b></td>
       <td class="tn"><select class="final" data-tn="${r.s.id}|final" aria-label="Nível final de ${esc(r.s.name)}"><option value="">${r.prop !== null ? 'Proposta: ' + r.prop : '—'}</option>${[1, 2, 3, 4, 5].map(v => `<option ${r.fin === v ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td class="stc">${stCell}</td>${evoCells}</tr>`;
   }).join('');
