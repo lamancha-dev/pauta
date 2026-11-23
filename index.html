@@ -2051,7 +2051,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.3.0';
+const PAUTA_VERSAO = '3.3.1';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2198,6 +2198,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Notas negativas (abaixo de 10 valores ou de 50%) aparecem agora destacadas a vermelho na pauta do período, na grelha final e no resultado do teste de cada aluno — no ecrã e a imprimir.',
   'Conteúdos: cada conteúdo de um domínio vale 100 pontos (200 no secundário) e tem um peso na nota do domínio (por omissão, pesos iguais). A nota do domínio é a média ponderada das notas dos conteúdos. As perguntas recomeçam no 1 em cada conteúdo.',
   'Setas ↑ e ↓: ao preparar um teste e ao editar os domínios e pesos, as setas passam de uma linha para a outra, como na grelha de correção.',
   'Ao abrir a PAUTA, pode carregar em «Mostrar» para ver a palavra-passe que está a escrever, e a PAUTA avisa quando as maiúsculas (Caps Lock) estão ligadas.',
