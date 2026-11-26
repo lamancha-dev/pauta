@@ -1862,6 +1862,7 @@ async function boot() {
   if (!window.crypto?.subtle || !('indexedDB' in window)) {
     gate(`<h1>Navegador não suportado</h1><p>Abra o ficheiro PAUTA.html no <b>Google Chrome</b> ou no <b>Microsoft Edge</b> atualizados.</p>`); return;
   }
+  if (new URLSearchParams(location.search).get('demo') === '1') { startDemo(); return; }
   await loadLicense();
   let vault = null; try { vault = await idbGet('vault'); } catch (e) { }
   if (vault) { if (APP.license) lockScreen(); else licenseScreen(() => lockScreen(), () => licenseScreen(() => lockScreen())); }
