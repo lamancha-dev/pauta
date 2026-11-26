@@ -266,8 +266,32 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .copyopts{display:grid;gap:6px;margin-top:10px}
 .grade.results td,.grade.results th{text-align:left;padding:8px 10px}
 .grade.results tr.low td{background:var(--pen3)}
-.grade td.gneg,.res.gneg,table.cmp td.gneg{background:#fdf0ee!important}.grade td.gneg b,.res.gneg b,table.cmp td.gneg b{color:var(--bad)}
-table.cmp{width:100%;border-collapse:collapse;margin-bottom:22px}table.cmp th,table.cmp td{border:1px solid var(--line);padding:7px 10px;text-align:center}table.cmp th{background:var(--pen3);font-weight:700}table.cmp td.name{text-align:left;font-weight:700}table.cmp td.best{background:#eaf5ef}table.cmp td.best b{color:#0b4d3e}td.cmpmut{color:var(--graph)}
+.grade td.gneg,.res.gneg{background:#fdf0ee!important}.grade td.gneg b,.res.gneg b{color:var(--bad)}
+.cmpcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-bottom:28px}
+.cmpcard{position:relative;display:flex;flex-direction:column;gap:10px;padding:20px 22px 18px 24px;border-radius:12px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 0 var(--line)}
+.cmpcard::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:var(--pen)}
+.cmpcard.wlow::before{background:var(--bad)}
+.cmphead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cmphead b{font:600 21px/1.15 var(--serif);letter-spacing:-.01em}
+.cmppct{font:700 30px/1 var(--serif);color:var(--ok)}
+.cmppct.low{color:var(--bad)}
+.cmpbarwrap{height:8px;border-radius:5px;background:var(--line2);overflow:hidden}
+.cmpbar{height:100%;border-radius:5px;background:var(--ok)}
+.cmpbar.low{background:var(--bad)}
+.cmprow{display:flex;justify-content:space-between;font-size:13px;color:var(--graph)}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px}
+.chip.good{background:#eaf5ef;color:#0b4d3e}
+.chip.bad{background:#fdf0ee;color:var(--bad)}
+.chip.mut{background:var(--line2);color:var(--graph)}
+table.cmp{width:100%;border-collapse:collapse;margin-bottom:22px}
+table.cmp th,table.cmp td{border:1px solid var(--line);padding:0;text-align:center}
+table.cmp th{background:var(--pen3);font-weight:700;padding:7px 10px}
+table.cmp td.name{text-align:left;font-weight:700;padding:7px 10px}
+table.cmp td.avg{font-weight:700;padding:7px 10px}
+table.cmp td.cmpmut{color:var(--graph);padding:7px 10px}
+table.cmp td.heat{position:relative}
+table.cmp td.heat b{position:relative;display:block;padding:7px 10px}
+table.cmp td.heat .hbg{position:absolute;inset:0}
 .grade.results .rcol{min-width:170px}.grade.results .rcol b{margin-left:8px}
 .rbar{display:inline-block;vertical-align:middle;width:100px;height:8px;border-radius:5px;background:var(--line2);overflow:hidden}
 .rbar i{display:block;height:100%;background:var(--ok);border-radius:5px}.rbar.low i{background:var(--pen)}
@@ -1032,20 +1056,28 @@ function compareHTML() {
     const media = present.length ? sum(present) / present.length : null;
     return { label, vals, media };
   }).sort((a, b) => (a.media ?? 999) - (b.media ?? 999));
-  const resumo = `<table class="cmp"><thead><tr><th>Turma</th><th>Disciplina · Ano</th><th>Alunos</th><th>Média</th><th>Positivas</th><th>Domínio mais forte</th><th>Domínio mais fraco</th></tr></thead><tbody>
-    ${data.map(x => `<tr><td class="name">${esc(x.c.name)}</td><td>${esc(x.c.subject)} · ${esc(x.c.year)}</td><td>${x.n}</td>
-      <td class="${x.media !== null && x.media < 50 ? 'gneg' : ''}"><b>${x.media !== null ? fmt(x.media, 0) + '%' : '—'}</b></td>
-      <td class="${x.positivas !== null && x.positivas < 50 ? 'gneg' : ''}">${x.positivas !== null ? fmt(x.positivas, 0) + '%' : '—'}</td>
-      <td class="best">${x.melhor ? `${esc(x.melhor.d.name)} <b>${fmt(x.melhor.pct, 0)}%</b>` : '<span class="cmpmut">—</span>'}</td>
-      <td class="${x.pior && x.pior.pct < 50 ? 'gneg' : ''}">${x.pior ? `${esc(x.pior.d.name)} <b>${fmt(x.pior.pct, 0)}%</b>` : '<span class="cmpmut">—</span>'}</td></tr>`).join('')}
-  </tbody></table>`;
-  const dominios = `<table class="cmp"><thead><tr><th>Domínio</th>${data.map(x => `<th>${esc(x.c.name)}</th>`).join('')}<th>Média</th></tr></thead><tbody>
-    ${domRows.map(r => `<tr><td class="name">${esc(r.label)}</td>${r.vals.map(v => `<td class="${v !== null && v < 50 ? 'gneg' : ''}">${v !== null ? fmt(v, 0) + '%' : '<span class="cmpmut">—</span>'}</td>`).join('')}<td><b>${r.media !== null ? fmt(r.media, 0) + '%' : '—'}</b></td></tr>`).join('')}
+  // cor em escala (mapa de calor): vermelho < 50%, laranja 50-69%, verde ≥ 70%
+  const heat = v => v === null ? 'transparent' : v < 50 ? '#fdf0ee' : v < 70 ? '#fff6d9' : '#eaf5ef';
+  const heatFg = v => v === null ? 'inherit' : v < 50 ? '#b42318' : v < 70 ? '#a0620a' : '#0b4d3e';
+  const cards = data.map(x => {
+    const low = x.media !== null && x.media < 50;
+    return `<div class="cmpcard${low ? ' wlow' : ''}">
+      <div class="cmphead"><div><b>${esc(x.c.name)}</b><div class="csub">${esc(x.c.subject)} · ${esc(x.c.year)} · ${x.n} aluno${x.n === 1 ? '' : 's'}</div></div>
+        <div class="cmppct${low ? ' low' : ''}">${x.media !== null ? fmt(x.media, 0) + '%' : '—'}</div></div>
+      <div><div class="cmprow"><span>Positivas</span><span>${x.positivas !== null ? fmt(x.positivas, 0) + '%' : '—'}</span></div>
+        <div class="cmpbarwrap"><div class="cmpbar${x.positivas !== null && x.positivas < 50 ? ' low' : ''}" style="width:${x.positivas !== null ? Math.max(3, x.positivas) : 0}%"></div></div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${x.melhor ? `<span class="chip good">${ic('check', 'sm')}${esc(x.melhor.d.name)} ${fmt(x.melhor.pct, 0)}%</span>` : ''}
+        ${x.pior ? `<span class="chip ${x.pior.pct < 50 ? 'bad' : 'mut'}">${esc(x.pior.d.name)} ${fmt(x.pior.pct, 0)}%</span>` : ''}
+      </div></div>`;
+  }).join('');
+  const dominios = `<table class="cmp"><thead><tr><th style="text-align:left;padding:7px 10px">Domínio</th>${data.map(x => `<th>${esc(x.c.name)}</th>`).join('')}<th>Média</th></tr></thead><tbody>
+    ${domRows.map(r => `<tr><td class="name">${esc(r.label)}</td>${r.vals.map(v => v === null ? '<td class="cmpmut">—</td>' : `<td class="heat"><div class="hbg" style="background:${heat(v)}"></div><b style="color:${heatFg(v)}">${fmt(v, 0)}%</b></td>`).join('')}<td class="avg">${r.media !== null ? fmt(r.media, 0) + '%' : '—'}</td></tr>`).join('')}
   </tbody></table>`;
   return `<section class="chead"><div><h1>Comparar turmas</h1><p>Resultados de ${choices[t] || '1.º período'} nas suas turmas (não inclui ensino profissional, que usa módulos/UFCD).</p></div>
     <div class="seg" role="tablist" aria-label="Período">${choices.map((lbl, i) => `<button role="tab" class="${t === i ? 'on' : ''}" data-term="${i}">${esc(lbl)}</button>`).join('')}</div></section>
-    <section class="panel"><h2 style="margin-top:0">Resumo por turma</h2>${resumo}
-    <h2>Comparação por domínio</h2><p class="hint">Domínios com o mesmo nome em turmas diferentes aparecem na mesma linha, para comparar. Ordenados do mais fraco para o mais forte (média de todas as turmas).</p>${dominios}
+    <section class="panel"><h2 style="margin-top:0">Resumo por turma</h2><div class="cmpcards">${cards}</div>
+    <h2>Comparação por domínio</h2><p class="hint">Domínios com o mesmo nome em turmas diferentes aparecem na mesma linha, para comparar — vermelho abaixo de 50%, amarelo 50-69%, verde 70% ou mais. Ordenados do mais fraco para o mais forte (média de todas as turmas).</p>${dominios}
     <button class="btn" data-cmp-excel>${ic('excel')}Excel</button></section>`;
 }
 async function compareExcelClick() {
@@ -2143,7 +2175,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.5.0';
+const PAUTA_VERSAO = '3.5.1';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2290,6 +2322,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  '«Comparar turmas» com novo visual: cartões por turma e um mapa de calor (vermelho/amarelo/verde) na comparação por domínio.',
   'Em «Definições» › «Cópia automática na nuvem»: escolha uma pasta do OneDrive, Google Drive ou Dropbox já instalada no computador e a PAUTA escreve lá, todos os dias e sem precisar de fazer nada, uma cópia cifrada dos dados. Protege contra perder o computador e a pen ao mesmo tempo.',
   'Novo separador «Comparar turmas» (aparece quando tem mais do que uma turma): resumo por turma (média, % de positivas, domínio mais forte e mais fraco) e uma tabela que compara os domínios com o mesmo nome entre todas as turmas, por período. Exporta para Excel.',
   'A grelha de critérios da Escrita (Exame Nacional 639 ou Prova Final 91) passa a aparecer também em turmas de PLNM, não só nas de Português.',
