@@ -266,7 +266,8 @@ textarea#licKey{font:13px/1.4 ui-monospace,Consolas,monospace;word-break:break-a
 .copyopts{display:grid;gap:6px;margin-top:10px}
 .grade.results td,.grade.results th{text-align:left;padding:8px 10px}
 .grade.results tr.low td{background:var(--pen3)}
-.grade td.gneg,.res.gneg{background:#fdf0ee!important}.grade td.gneg b,.res.gneg b{color:var(--bad)}
+.grade td.gneg,.res.gneg,table.cmp td.gneg{background:#fdf0ee!important}.grade td.gneg b,.res.gneg b,table.cmp td.gneg b{color:var(--bad)}
+table.cmp{width:100%;border-collapse:collapse;margin-bottom:22px}table.cmp th,table.cmp td{border:1px solid var(--line);padding:7px 10px;text-align:center}table.cmp th{background:var(--pen3);font-weight:700}table.cmp td.name{text-align:left;font-weight:700}table.cmp td.best{background:#eaf5ef}table.cmp td.best b{color:#0b4d3e}td.cmpmut{color:var(--graph)}
 .grade.results .rcol{min-width:170px}.grade.results .rcol b{margin-left:8px}
 .rbar{display:inline-block;vertical-align:middle;width:100px;height:8px;border-radius:5px;background:var(--line2);overflow:hidden}
 .rbar i{display:block;height:100%;background:var(--ok);border-radius:5px}.rbar.low i{background:var(--pen)}
@@ -954,6 +955,7 @@ function renderSide() {
   const cls = APP.state.classes;
   $('#sideNav').innerHTML = `
     <button class="nav ${view.name === 'home' ? 'on' : ''}" data-go="home">${ic('home')}<span>Início</span></button>
+    ${cls.length > 1 ? `<button class="nav ${view.name === 'compare' ? 'on' : ''}" data-go="compare">${ic('chart')}<span>Comparar turmas</span></button>` : ''}
     <div class="navlabel">As minhas turmas</div>
     ${cls.map(c => `<button class="nav cls ${view.classId === c.id && view.name !== 'home' && view.name !== 'settings' && view.name !== 'help' ? 'on' : ''}" data-open-class="${c.id}"><span class="dot"></span><span><b>${esc(c.name)}</b><small>${esc(c.subject)}</small></span></button>`).join('')}
     <button class="nav add" data-new-class>${ic('plus')}<span>Nova turma</span></button>
@@ -970,7 +972,9 @@ function render() {
   const main = $('#main');
   if (view.name === 'class' && !cur()) view.name = 'home';
   if (view.name === 'moment' && !curMoment()) view.name = cur() ? 'class' : 'home';
+  if (view.name === 'compare' && APP.state.classes.length < 2) view.name = 'home';
   if (view.name === 'home') main.innerHTML = homeHTML();
+  else if (view.name === 'compare') main.innerHTML = compareHTML();
   else if (view.name === 'class') main.innerHTML = classHTML();
   else if (view.name === 'moment') { main.innerHTML = momentHTML(); afterMomentRender(); }
   else if (view.name === 'settings') main.innerHTML = settingsHTML();
@@ -989,6 +993,82 @@ function homeHTML() {
     return `<button class="ccard" data-open-class="${c.id}"><span class="ctag">${esc(levelTag(c))}</span><b>${esc(c.name)}</b><span class="csub">${esc(c.subject)} · ${esc(c.year)}</span>
       <span class="cmeta"><span>${ic('users')}${n} aluno${n === 1 ? '' : 's'}</span><span>${ic('test')}${moms} momento${moms === 1 ? '' : 's'}</span></span></button>`;
   }).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------- comparar turmas
+/** Dados de comparação de uma turma num período: média, % de positivas, resultado por domínio. */
+function compareClassData(c, t) {
+  const students = activeStudents(c);
+  const fgs = students.map(s => finalGrade(c, s, t)).filter(f => f && f.pct !== null && f.pct !== undefined);
+  const media = fgs.length ? sum(fgs.map(f => f.pct)) / fgs.length : null;
+  const positivas = fgs.length ? sum(fgs.map(f => f.pct >= 50 ? 1 : 0)) / fgs.length * 100 : null;
+  const doms = c.domains.map(d => {
+    const vs = students.map(s => domainTermGrade(c, s, d.id, t)).filter(v => v !== null);
+    return { d, pct: vs.length ? sum(vs.map(v => v * 5)) / vs.length : null };
+  }).filter(x => x.pct !== null);
+  const sorted = [...doms].sort((a, b) => a.pct - b.pct);
+  return { c, n: students.length, media, positivas, melhor: sorted[sorted.length - 1] || null, pior: doms.length > 1 ? sorted[0] : null, doms };
+}
+function compareTermChoices(cls) {
+  const n = Math.max(1, ...cls.map(c => terms(c).length));
+  const sample = cls.find(c => terms(c).length === n) || cls[0];
+  return terms(sample).slice(0, n);
+}
+function compareHTML() {
+  const cls = APP.state.classes.filter(c => !isProf(c));
+  if (cls.length < 2) return `<section class="hero"><div><h1>Comparar turmas</h1><p>Precisa de, pelo menos, duas turmas (sem ser de ensino profissional) para comparar resultados.</p></div></section>`;
+  const choices = compareTermChoices(cls); if (view.term >= choices.length) view.term = 0;
+  const t = view.term;
+  const data = cls.map(c => compareClassData(c, t)).filter(x => x.n);
+  if (!data.length) return `<section class="hero"><div><h1>Comparar turmas</h1><p>Ainda não há alunos ou notas lançadas nestas turmas.</p></div></section>`;
+  // nomes de domínio agrupados (ignorando maiúsculas/minúsculas e espaços)
+  const domKey = n => normalize(n).replace(/\s+/g, ' ').trim();
+  const domNames = new Map();
+  data.forEach(x => x.doms.forEach(({ d }) => { const k = domKey(d.name); if (!domNames.has(k)) domNames.set(k, d.name); }));
+  const domRows = [...domNames.entries()].map(([k, label]) => {
+    const vals = data.map(x => { const f = x.doms.find(o => domKey(o.d.name) === k); return f ? f.pct : null; });
+    const present = vals.filter(v => v !== null);
+    const media = present.length ? sum(present) / present.length : null;
+    return { label, vals, media };
+  }).sort((a, b) => (a.media ?? 999) - (b.media ?? 999));
+  const resumo = `<table class="cmp"><thead><tr><th>Turma</th><th>Disciplina · Ano</th><th>Alunos</th><th>Média</th><th>Positivas</th><th>Domínio mais forte</th><th>Domínio mais fraco</th></tr></thead><tbody>
+    ${data.map(x => `<tr><td class="name">${esc(x.c.name)}</td><td>${esc(x.c.subject)} · ${esc(x.c.year)}</td><td>${x.n}</td>
+      <td class="${x.media !== null && x.media < 50 ? 'gneg' : ''}"><b>${x.media !== null ? fmt(x.media, 0) + '%' : '—'}</b></td>
+      <td class="${x.positivas !== null && x.positivas < 50 ? 'gneg' : ''}">${x.positivas !== null ? fmt(x.positivas, 0) + '%' : '—'}</td>
+      <td class="best">${x.melhor ? `${esc(x.melhor.d.name)} <b>${fmt(x.melhor.pct, 0)}%</b>` : '<span class="cmpmut">—</span>'}</td>
+      <td class="${x.pior && x.pior.pct < 50 ? 'gneg' : ''}">${x.pior ? `${esc(x.pior.d.name)} <b>${fmt(x.pior.pct, 0)}%</b>` : '<span class="cmpmut">—</span>'}</td></tr>`).join('')}
+  </tbody></table>`;
+  const dominios = `<table class="cmp"><thead><tr><th>Domínio</th>${data.map(x => `<th>${esc(x.c.name)}</th>`).join('')}<th>Média</th></tr></thead><tbody>
+    ${domRows.map(r => `<tr><td class="name">${esc(r.label)}</td>${r.vals.map(v => `<td class="${v !== null && v < 50 ? 'gneg' : ''}">${v !== null ? fmt(v, 0) + '%' : '<span class="cmpmut">—</span>'}</td>`).join('')}<td><b>${r.media !== null ? fmt(r.media, 0) + '%' : '—'}</b></td></tr>`).join('')}
+  </tbody></table>`;
+  return `<section class="chead"><div><h1>Comparar turmas</h1><p>Resultados de ${choices[t] || '1.º período'} nas suas turmas (não inclui ensino profissional, que usa módulos/UFCD).</p></div>
+    <div class="seg" role="tablist" aria-label="Período">${choices.map((lbl, i) => `<button role="tab" class="${t === i ? 'on' : ''}" data-term="${i}">${esc(lbl)}</button>`).join('')}</div></section>
+    <section class="panel"><h2 style="margin-top:0">Resumo por turma</h2>${resumo}
+    <h2>Comparação por domínio</h2><p class="hint">Domínios com o mesmo nome em turmas diferentes aparecem na mesma linha, para comparar. Ordenados do mais fraco para o mais forte (média de todas as turmas).</p>${dominios}
+    <button class="btn" data-cmp-excel>${ic('excel')}Excel</button></section>`;
+}
+async function compareExcelClick() {
+  const cls = APP.state.classes.filter(c => !isProf(c)); const choices = compareTermChoices(cls); const t = Math.min(view.term, choices.length - 1);
+  const data = cls.map(c => compareClassData(c, t)).filter(x => x.n);
+  const domKey = n => normalize(n).replace(/\s+/g, ' ').trim();
+  const domNames = new Map(); data.forEach(x => x.doms.forEach(({ d }) => { const k = domKey(d.name); if (!domNames.has(k)) domNames.set(k, d.name); }));
+  const domRows = [...domNames.entries()].map(([k, label]) => { const vals = data.map(x => { const f = x.doms.find(o => domKey(o.d.name) === k); return f ? f.pct : null; }); const present = vals.filter(v => v !== null); return { label, vals, media: present.length ? sum(present) / present.length : null }; }).sort((a, b) => (a.media ?? 999) - (b.media ?? 999));
+  return excelCompare(cls, t, data, domRows, choices[t] || '1.º período');
+}
+async function excelCompare(cls, t, data, domRows, label) {
+  const h1 = [{ v: 'Turma', s: 3 }, { v: 'Disciplina', s: 3 }, { v: 'Ano', s: 3 }, { v: 'Alunos', s: 3 }, { v: 'Média (%)', s: 3 }, { v: 'Positivas (%)', s: 3 }, { v: 'Domínio mais forte', s: 3 }, { v: '%', s: 3 }, { v: 'Domínio mais fraco', s: 3 }, { v: '%', s: 3 }];
+  const rows1 = [[{ v: `Comparação de turmas — ${label}`, s: 1 }], [], h1];
+  data.forEach(x => rows1.push([{ v: x.c.name, s: 5 }, { v: x.c.subject, s: 5 }, { v: x.c.year, s: 4 }, { v: x.n, s: 4 },
+    { v: x.media !== null ? round(x.media, 1) : '', s: 6 }, { v: x.positivas !== null ? round(x.positivas, 1) : '', s: 6 },
+    { v: x.melhor ? x.melhor.d.name : '', s: 5 }, { v: x.melhor ? round(x.melhor.pct, 1) : '', s: 6 },
+    { v: x.pior ? x.pior.d.name : '', s: 5 }, { v: x.pior ? round(x.pior.pct, 1) : '', s: 6 }]));
+  const h2 = [{ v: 'Domínio', s: 3 }, ...data.map(x => ({ v: x.c.name, s: 3 })), { v: 'Média', s: 3 }];
+  const rows2 = [[{ v: `Comparação por domínio — ${label}`, s: 1 }], [], h2];
+  domRows.forEach(r => rows2.push([{ v: r.label, s: 5 }, ...r.vals.map(v => ({ v: v !== null ? round(v, 1) : '', s: 6 })), { v: r.media !== null ? round(r.media, 1) : '', s: 13 }]));
+  await saveStyled('PAUTA_Comparar_turmas.xlsx', [
+    { name: 'Resumo por turma', rows: rows1, widths: [16, 18, 10, 8, 10, 11, 22, 8, 22, 8] },
+    { name: 'Domínios', rows: rows2, widths: [22, ...data.map(() => 14), 10] }]);
+  toast('Excel guardado nas Transferências.');
 }
 
 // ---------------------------------------------------------------- turma
@@ -2051,7 +2131,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.3.2';
+const PAUTA_VERSAO = '3.4.0';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2198,6 +2278,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Novo separador «Comparar turmas» (aparece quando tem mais do que uma turma): resumo por turma (média, % de positivas, domínio mais forte e mais fraco) e uma tabela que compara os domínios com o mesmo nome entre todas as turmas, por período. Exporta para Excel.',
   'A grelha de critérios da Escrita (Exame Nacional 639 ou Prova Final 91) passa a aparecer também em turmas de PLNM, não só nas de Português.',
   'Notas negativas (abaixo de 10 valores ou de 50%) aparecem agora destacadas a vermelho na pauta do período, na grelha final e no resultado do teste de cada aluno — no ecrã e a imprimir.',
   'Conteúdos: cada conteúdo de um domínio vale 100 pontos (200 no secundário) e tem um peso na nota do domínio (por omissão, pesos iguais). A nota do domínio é a média ponderada das notas dos conteúdos. As perguntas recomeçam no 1 em cada conteúdo.',
@@ -2384,6 +2465,7 @@ document.addEventListener('click', async e => {
   if ((el = a('[data-excel-moment]'))) return excelMoment(cur(), cur().moments.find(m => m.id === el.dataset.excelMoment)).catch(err => toast('Não foi possível criar o Excel: ' + err.message));
   if (a('[data-print-pauta]')) return printPauta(cur(), view.term);
   if (a('[data-excel-pauta]')) return excelPauta(cur(), view.term).catch(err => toast('Não foi possível criar o Excel: ' + err.message));
+  if (a('[data-cmp-excel]')) return compareExcelClick().catch(err => toast('Não foi possível criar o Excel: ' + err.message));
   if ((el = a('[data-fill]'))) { const [key, max, label] = el.dataset.fill.split('|'); return fillColumn(key, Number(max), label); }
   if ((el = a('[data-rubric]'))) { const [sid, key, max] = el.dataset.rubric.split('|'); if (isAbsent(curMoment(), sid)) return; return openRubric(sid, key, Number(max)); }
   if (a('[data-add-students]')) return addStudentsDialog(cur());
