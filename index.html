@@ -1946,6 +1946,8 @@ function lockScreen(msg = '') {
 function startDemo() {
   APP.demo = true; APP.key = null; APP.state = emptyState(); APP.state.teacher = { name: 'Professora', school: 'Escola de demonstração', logo: '' };
   APP.state.classes.push(makeDemoClass());
+  const c2 = makeDemoClass(); c2.name = '9.º Y (exemplo)';
+  APP.state.classes.push(c2);
   closeGate(); go('class', { classId: APP.state.classes[0].id, tab: 'momentos', term: 0 });
   toast('Turma fictícia criada. Explore à vontade: nada é guardado.', 4500);
 }
