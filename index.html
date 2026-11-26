@@ -709,7 +709,7 @@ async function persist() {
   try {
     const env = await encryptState(APP.state, APP.key, APP.salt);
     const prev = await idbGet('vault'); if (prev) await idbPut('vault_anterior', prev);
-    await idbPut('vault', env); APP.savedVersion = v; APP.error = ''; copiaDiaria(env);
+    await idbPut('vault', env); APP.savedVersion = v; APP.error = ''; copiaDiaria(env); copiaNuvem(env);
     if (APP.folder) {
       try { await writePen(env); APP.folderVersion = v; }
       catch (e) { penOff(APP.folder, 'absent'); setTimeout(() => syncPen(), 50); }   // pen retirada ou alterada noutro computador: volta a sincronizar sozinha
@@ -761,6 +761,7 @@ async function ofertaInstalar() {
       { label: 'Pôr o ícone no Ambiente de Trabalho', kind: 'primary', run: async () => { const r = await localApi('/api/instalar', { method: 'POST' }); if (!r.ok) throw new Error('Não foi possível pôr o ícone. Tente de novo.'); toast('Pronto: tem o ícone PAUTA no Ambiente de Trabalho.', 6000); } }] });
 }
 const hasFolderAPI = () => LOCAL || typeof window.showDirectoryPicker === 'function';
+const hasRealFolderPicker = () => typeof window.showDirectoryPicker === 'function';
 
 // ---------------------------------------------------------------- dados da PAUTA anterior
 /** Converte dados da versão anterior (turmas, alunos, domínios, testes, notas lançadas à mão, atitudes). */
@@ -977,7 +978,7 @@ function render() {
   else if (view.name === 'compare') main.innerHTML = compareHTML();
   else if (view.name === 'class') main.innerHTML = classHTML();
   else if (view.name === 'moment') { main.innerHTML = momentHTML(); afterMomentRender(); }
-  else if (view.name === 'settings') main.innerHTML = settingsHTML();
+  else if (view.name === 'settings') { main.innerHTML = settingsHTML(); paintCloudInfo(); }
   else if (view.name === 'help') main.innerHTML = helpHTML();
 }
 
@@ -1567,7 +1568,18 @@ function settingsHTML() {
     </div><p class="hint">Aparecem no cabeçalho de todas as impressões (pauta, grelha em branco), junto com o logótipo da PAUTA. Todas as impressões são em A4.</p></section>
   <section><h2>Licença</h2>${APP.license ? `<p>Licenciado a <b>${esc(APP.license.name)}</b>${APP.license.school ? ' · ' + esc(APP.license.school) : ''}. Este nome aparece em todas as impressões.</p>` : '<p class="hint">Sem licença (modo de experiência).</p>'}<button class="btn sm" data-change-license>${ic('lock')}${APP.license ? 'Mudar a chave de licença' : 'Ativar licença'}</button></section>
   <section><h2>Os meus dados</h2><p class="hint">Os dados ficam cifrados com a sua palavra-passe, neste computador e, se escolher, numa pen. Nada é enviado para a Internet.${LOCAL ? ' Todos os dias é feita uma cópia de segurança automática em Documentos › PAUTA - cópias de segurança (guarda as do último mês).' : ''} A chave de recuperação abre os dados se se esquecer da palavra-passe.</p>
-    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-rec>${ic('lock')}Criar chave de recuperação</button><button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section></section>`;
+    <div class="btnrow left">${hasFolderAPI() ? `<button class="btn" data-data="pen">${ic('usb')}${APP.folder ? 'Mudar de pen' : 'Guardar também numa pen'}</button>` : ''}${LOCAL ? `<button class="btn" data-instalar>${ic('save')}Pôr o ícone no Ambiente de Trabalho</button>` : ''}<button class="btn" data-rec>${ic('lock')}Criar chave de recuperação</button><button class="btn" data-data="backup">${ic('copy')}Guardar cópia de segurança</button><button class="btn" data-data="open">${ic('open')}Abrir dados (incluindo da PAUTA anterior)</button><button class="btn" data-data="password">${ic('lock')}Mudar palavra-passe</button></div></section>
+  ${hasRealFolderPicker() ? `<section><h2>Cópia automática na nuvem</h2><p class="hint">Escolha uma pasta do OneDrive, Google Drive ou Dropbox já instalado neste computador (a pasta tem de aparecer no Explorador/Finder). Todos os dias, sem precisar de fazer nada, a PAUTA escreve aí uma cópia cifrada dos dados. Assim que essa pasta sincronizar, a cópia fica também na nuvem — protegida mesmo que perca o computador e a pen ao mesmo tempo.</p>
+    <div id="cloudInfo" class="hint">A verificar…</div>
+    <div class="btnrow left" id="cloudBtns"><button class="btn" data-cloud="choose">${ic('upload')}Escolher pasta da nuvem</button></div></section>` : ''}</section>`;
+}
+async function paintCloudInfo() {
+  const box = $('#cloudInfo'); if (!box) return;
+  const st = await cloudStatus();
+  if (!st) { box.textContent = 'Ainda não escolheu nenhuma pasta.'; return; }
+  const btns = $('#cloudBtns'); if (btns) btns.innerHTML = `<button class="btn" data-cloud="choose">${ic('upload')}Mudar de pasta</button><button class="btn" data-cloud="forget">${ic('x')}Deixar de guardar aí</button>`;
+  if (st.perm !== 'granted') { box.innerHTML = `<b style="color:var(--warn)">Falta autorizar o acesso a «${esc(st.name)}».</b> <button type="button" class="link" data-cloud="reautorizar">Autorizar agora</button>`; return; }
+  box.innerHTML = `A guardar em «${esc(st.name)}»${st.ultima ? ` · última cópia ${whenTxt(st.ultima)}` : ' · ainda sem nenhuma cópia escrita'}.`;
 }
 function helpHTML() {
   return `<section class="chead"><div><h1>Como funciona</h1><p>Tudo o que precisa de saber, numa página. Está a usar a <b>PAUTA versão ${PAUTA_VERSAO}</b> · <button type="button" class="link" data-versao>ver as novidades</button></p></div></section>
@@ -2131,7 +2143,7 @@ if (/^https?:$/.test(location.protocol) && !LOCAL) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 // ---------------------------------------------------------------- aviso de versão nova (só na versão online)
-const PAUTA_VERSAO = '3.4.0';
+const PAUTA_VERSAO = '3.5.0';
 const PAUTA_ONLINE = 'https://lamancha-dev.github.io/pauta/';
 const maisNova = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
 if (/^https?:$/.test(location.protocol) && !LOCAL) {
@@ -2278,6 +2290,7 @@ function recuperar() {
 
 // ---------------------------------------------------------------- novidades (aparecem uma vez depois de cada atualização)
 const NOVIDADES = [
+  'Em «Definições» › «Cópia automática na nuvem»: escolha uma pasta do OneDrive, Google Drive ou Dropbox já instalada no computador e a PAUTA escreve lá, todos os dias e sem precisar de fazer nada, uma cópia cifrada dos dados. Protege contra perder o computador e a pen ao mesmo tempo.',
   'Novo separador «Comparar turmas» (aparece quando tem mais do que uma turma): resumo por turma (média, % de positivas, domínio mais forte e mais fraco) e uma tabela que compara os domínios com o mesmo nome entre todas as turmas, por período. Exporta para Excel.',
   'A grelha de critérios da Escrita (Exame Nacional 639 ou Prova Final 91) passa a aparecer também em turmas de PLNM, não só nas de Português.',
   'Notas negativas (abaixo de 10 valores ou de 50%) aparecem agora destacadas a vermelho na pauta do período, na grelha final e no resultado do teste de cada aluno — no ecrã e a imprimir.',
@@ -2318,6 +2331,43 @@ async function copiaDiaria(env) {
   const hoje = new Date().toISOString().slice(0, 10);
   try { if (localStorage.getItem('pautaCopia') === hoje) return; } catch (e) { }
   try { const r = await localApi('/api/copia', { method: 'POST', body: JSON.stringify(env) }); if (r.ok) { try { localStorage.setItem('pautaCopia', hoje); } catch (e) { } } } catch (e) { }
+}
+// ---------------------------------------------------------------- cópia de segurança automática numa pasta da nuvem (OneDrive, Google Drive, etc.)
+// Escreve, uma vez por dia e sem perguntar nada, num ficheiro fixo (PAUTA_copia_seguranca.pauta) dentro da pasta
+// escolhida. Nunca lê essa pasta de volta nem compara versões — é só uma cópia de saída, por isso não há conflitos
+// como os da pen. O histórico de versões fica a cargo do próprio serviço de nuvem (OneDrive/Drive guardam isso sozinhos).
+const CLOUD_FILE = 'PAUTA_copia_seguranca.pauta';
+async function cloudStatus() {
+  let cfg = null; try { cfg = await idbGet('cloudFolder'); } catch (e) { }
+  if (!cfg?.dir) return null;
+  let perm = 'prompt'; try { perm = await cfg.dir.queryPermission({ mode: 'readwrite' }); } catch (e) { perm = 'prompt'; }
+  let ultima = null; try { ultima = localStorage.getItem('pautaCopiaNuvemQuando'); } catch (e) { }
+  return { name: cfg.dir.name, perm, ultima };
+}
+async function copiaNuvem(env) {
+  let cfg = null; try { cfg = await idbGet('cloudFolder'); } catch (e) { }
+  if (!cfg?.dir) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  try { if (localStorage.getItem('pautaCopiaNuvem') === hoje) return; } catch (e) { }
+  try {
+    if (await cfg.dir.queryPermission({ mode: 'readwrite' }) !== 'granted') return;
+    await writeFolderFile(cfg.dir, CLOUD_FILE, env);
+    try { localStorage.setItem('pautaCopiaNuvem', hoje); localStorage.setItem('pautaCopiaNuvemQuando', new Date().toISOString()); } catch (e) { }
+  } catch (e) { }
+}
+async function chooseCloudFolder() {
+  if (APP.demo) return demoBlocked();
+  let dir; try { dir = await showDirectoryPicker({ id: 'pauta-nuvem', mode: 'readwrite' }); } catch (e) { return; }
+  try { await idbPut('cloudFolder', { dir }); } catch (e) { return toast('Não foi possível guardar esta escolha.'); }
+  try { await writeFolderFile(dir, CLOUD_FILE, await idbGet('vault')); localStorage.setItem('pautaCopiaNuvem', new Date().toISOString().slice(0, 10)); localStorage.setItem('pautaCopiaNuvemQuando', new Date().toISOString()); }
+  catch (e) { return toast('Escolhida, mas não foi possível escrever nessa pasta. Escolha outra.'); }
+  toast(`Pronto: a PAUTA guarda agora, todos os dias, uma cópia em «${esc(dir.name)}». Se essa pasta sincronizar com o OneDrive ou o Google Drive, a cópia fica também na nuvem, automaticamente.`, 7000);
+  render();
+}
+async function forgetCloudFolder() {
+  try { await idbDel('cloudFolder'); } catch (e) { }
+  try { localStorage.removeItem('pautaCopiaNuvem'); localStorage.removeItem('pautaCopiaNuvemQuando'); } catch (e) { }
+  toast('Deixou de guardar cópias automáticas nessa pasta.'); render();
 }
 // ---------------------------------------------------------------- passar as notas para o Inovar (ou outro programa da escola)
 /** A nota a lançar: a classificação final que o professor decidiu; se não decidiu, a proposta arredondada. */
@@ -2489,6 +2539,13 @@ document.addEventListener('click', async e => {
     if (APP.demo && k !== 'open') return demoBlocked();
     if (k === 'pen') return choosePen(); if (k === 'open') return openMyData(); if (k === 'backup') return backupCopy(); if (k === 'password') return changePassword();
     if (k === 'lock') { await persist(); APP.state = null; APP.key = null; APP.folder = null; APP.remembered = null; APP.penIssue = ''; APP.keys = {}; APP.penMtime = null; $('#main').innerHTML = ''; return lockScreen(); }
+  }
+  if ((el = a('[data-cloud]'))) {
+    const k = el.dataset.cloud;
+    if (APP.demo) return demoBlocked();
+    if (k === 'choose') return chooseCloudFolder();
+    if (k === 'forget') { if (await confirmBox('Deixar de guardar cópias nessa pasta?', 'As cópias já escritas lá mantêm-se; a PAUTA só deixa de as atualizar.', 'Deixar de guardar', true)) await forgetCloudFolder(); return; }
+    if (k === 'reautorizar') { let cfg = null; try { cfg = await idbGet('cloudFolder'); } catch (e) { } if (!cfg?.dir) return; try { if (await cfg.dir.requestPermission({ mode: 'readwrite' }) === 'granted') { toast('Autorizado.'); paintCloudInfo(); } } catch (e) { } return; }
   }
 });
 function fillColumn(key, max, label) {
